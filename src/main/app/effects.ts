@@ -1,0 +1,69 @@
+import type { Commit, DeadlineView, Repo, ServiceDataMap, ServiceId, Settings } from '../../shared/types'
+import { alertKey, buildDeadlineViews } from '../links/deadlineAlerts'
+
+const COMMIT_TTL = 5 * 60_000
+const MAX_TEXT = 200
+
+type Data = Partial<{ [K in ServiceId]: ServiceDataMap[K] | null }>
+
+export interface EffectsDeps {
+  lastCommit(fullName: string, branch: string): Promise<Commit | null>
+  settings(): Settings
+  hub: { push(key: string, service: ServiceId, title: string, body: string, url?: string): boolean }
+  now(): number
+}
+
+export const clip = (s: unknown, max = MAX_TEXT): string => String(s ?? '').slice(0, max)
+
+/** Clé de déduplication d'une notification Teams (la charge utile vient de la page : à plafonner). */
+export function teamsKey(title: string, body: string, tag: string): string {
+  return tag ? `teams:${tag}` : `teams:${title}|${body}`
+}
+
+export function createEffects(deps: EffectsDeps) {
+  const commits = new Map<string, { at: number; commit: Commit | null }>()
+
+  async function commitFor(repo: Repo): Promise<Commit | null> {
+    const hit = commits.get(repo.fullName)
+    if (hit && deps.now() - hit.at < COMMIT_TTL) return hit.commit
+    try {
+      const commit = await deps.lastCommit(repo.fullName, repo.defaultBranch)
+      commits.set(repo.fullName, { at: deps.now(), commit })
+      return commit
+    } catch {
+      // Erreur réseau ou token : on réessaiera au prochain rafraîchissement.
+      return hit?.commit ?? null
+    }
+  }
+
+  async function deadlines(data: Data): Promise<DeadlineView[]> {
+    const intra = data.intra
+    if (!intra) return []
+    const repos = data.github?.repos ?? []
+    const manual = settingsLinks()
+    const now = new Date(deps.now())
+    const first = buildDeadlineViews(intra.deadlines, repos, {}, manual, now)
+    const linked = new Map<string, Repo>()
+    for (const v of first) if (v.repo) linked.set(v.repo.fullName, v.repo)
+    const fetched: Record<string, Commit | null> = {}
+    await Promise.all([...linked.values()].map(async (r) => { fetched[r.fullName] = await commitFor(r) }))
+    return buildDeadlineViews(intra.deadlines, repos, fetched, manual, now)
+  }
+
+  const settingsLinks = (): Record<string, string> => deps.settings().repoLinks
+
+  return {
+    deadlines,
+    /** À appeler après chaque rafraîchissement : alertes de rendu + nouvelles notifications. */
+    async afterRefresh(data: Data): Promise<void> {
+      for (const v of await deadlines(data)) {
+        const key = alertKey(v)
+        if (!key) continue
+        const urgent = v.alert === 'urgent'
+        deps.hub.push(key, 'intra', urgent ? 'Rendu urgent' : 'Rendu bientôt dû', `${v.title} — fin ${new Date(v.end).toLocaleString('fr-FR')}`, v.url)
+      }
+      for (const n of data.github?.notifications ?? []) deps.hub.push(`github:${n.id}`, 'github', n.title, n.repo, n.url)
+      for (const n of data.intra?.notifications ?? []) deps.hub.push(`intra:${n.id}`, 'intra', n.title, '')
+    }
+  }
+}

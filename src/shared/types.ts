@@ -26,3 +26,24 @@ export interface DeadlineView extends Deadline { repo: Repo | null; lastCommit: 
 export interface SearchItem { id: string; kind: 'repo' | 'pr' | 'issue' | 'deadline' | 'page'; title: string; subtitle?: string; service: ServiceId | 'app'; url: string; date?: string }
 
 export interface Settings { repoLinks: Record<string /* deadline id */, string /* repo fullName */>; notify: Record<ServiceId, boolean>; theme: 'dark' | 'light' }
+
+export type SetTokenResult = { ok: true } | { ok: false; error: 'ENCRYPTION_UNAVAILABLE' }
+export interface OpenTarget { service: ServiceId | 'app'; url?: string }
+export interface TeamsNotificationPayload { title: string; body: string; tag: string }
+
+/** API exposée au renderer par le preload sous `window.epihub`. */
+export interface EpihubApi {
+  snapshot(): Promise<{ [K in ServiceId]: ServiceSnapshot<K> }>
+  refresh(id?: ServiceId): Promise<void>
+  deadlines(): Promise<DeadlineView[]>
+  search(query: string): Promise<SearchItem[]>
+  getSettings(): Promise<Settings>
+  updateSettings(patch: Partial<Settings>): Promise<Settings>
+  setGithubToken(token: string): Promise<SetTokenResult>
+  share(item: { title: string; url: string; context?: string }): Promise<string>
+  teamsTitle(title: string): Promise<void>
+  teamsNavigate(url: string): Promise<void>
+  teamsNotification(n: TeamsNotificationPayload): Promise<void>
+  onChanged(cb: (snapshot: { [K in ServiceId]: ServiceSnapshot<K> }) => void): () => void
+  onOpen(cb: (target: OpenTarget) => void): () => void
+}
