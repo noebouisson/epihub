@@ -26,3 +26,23 @@ test('purge les clés périmées à chaque push', () => { hub.push('old', 'intra
 test('cible : service et url', () => { hub.push('k', 'github', 't', 'b', 'https://u'); expect(shown[0].target).toEqual({ service: 'github', url: 'https://u' }) })
 
 test('prime marque sans afficher', () => { hub.prime(['a', 'b']); expect(shown).toHaveLength(0); expect(Object.keys(saved)).toEqual(['a', 'b']); expect(hub.push('a', 'github', 't', 'b')).toBe(false) })
+
+test('prime avec service pose un marqueur jamais purgé', () => {
+  expect(hub.isPrimed('github')).toBe(false)
+  hub.prime(['a'], 'github')
+  expect(hub.isPrimed('github')).toBe(true)
+  expect(hub.isPrimed('intra')).toBe(false)
+  t += 30 * 864e5
+  hub.push('x', 'intra', 't', 'b')
+  expect(hub.isPrimed('github')).toBe(true)
+  expect(saved.a).toBeUndefined()
+})
+test('ttl court : le même message Teams 3 minutes plus tard notifie à nouveau', () => {
+  const ttl = 2 * 60_000
+  expect(hub.push('teams:k', 'teams', 't', 'b', undefined, ttl)).toBe(true)
+  t += 60_000
+  expect(hub.push('teams:k', 'teams', 't', 'b', undefined, ttl)).toBe(false)
+  t += 3 * 60_000
+  expect(hub.push('teams:k', 'teams', 't', 'b', undefined, ttl)).toBe(true)
+  expect(shown).toHaveLength(2)
+})
