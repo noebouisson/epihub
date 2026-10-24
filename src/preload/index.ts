@@ -21,6 +21,7 @@ const api: EpihubApi = {
   teamsNavigate: (u) => ipcRenderer.invoke('epihub:teams:navigate', u),
   teamsNotification: (n) => ipcRenderer.invoke('epihub:teams:notification', n),
   onChanged: (cb) => subscribe('epihub:changed', cb),
+  onPalette: (cb) => subscribe<void>('epihub:palette', () => cb()),
   onOpen: (cb) => subscribe('epihub:open', cb)
 }
 

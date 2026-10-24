@@ -29,11 +29,13 @@ export function Home({ snapshot, settings, onSettings, open, setView, toast }: P
     };
   }, [snapshot, settings?.repoLinks]);
 
-  const refresh = (id?: ServiceId): void => void window.epihub.refresh(id);
+  const refresh = (id?: ServiceId): void => void window.epihub.refresh(id).catch(() => undefined);
   const refreshAll = async (): Promise<void> => {
     setRefreshing(true);
     try {
       await window.epihub.refresh();
+    } catch {
+      /* l'état de chaque service s'affiche dans sa carte */
     } finally {
       setRefreshing(false);
     }

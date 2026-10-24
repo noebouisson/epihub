@@ -41,10 +41,12 @@ export interface EpihubApi {
   updateSettings(patch: Partial<Settings>): Promise<Settings>
   setGithubToken(token: string): Promise<SetTokenResult>
   share(item: { title: string; url: string; context?: string }): Promise<string>
+  /** URL file: canonique du preload Teams. */
   teamsPreloadPath(): Promise<string>
   teamsTitle(title: string): Promise<void>
   teamsNavigate(url: string): Promise<void>
   teamsNotification(n: TeamsNotificationPayload): Promise<void>
   onChanged(cb: (snapshot: { [K in ServiceId]: ServiceSnapshot<K> }) => void): () => void
+  onPalette(cb: () => void): () => void
   onOpen(cb: (target: OpenTarget) => void): () => void
 }

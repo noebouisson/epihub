@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { isAllowedUrl } from '../../../shared/domains';
+import { isAllowedUrl, isServiceHomeOrigin } from '../../../shared/domains';
 import type { ServiceId, TeamsNotificationPayload } from '../../../shared/types';
 import { SERVICES } from '../services';
 
@@ -21,13 +21,14 @@ export function ServiceView({ service, visible, request }: Props): JSX.Element |
   const def = SERVICES.find((s) => s.id === service)!;
   const ref = useRef<WebviewEl | null>(null);
   const [teamsPreload, setTeamsPreload] = useState<string | null>(null);
-  const [initial] = useState(() => (request && isAllowedUrl(request.url) ? request.url : def.home));
-  const handled = useRef(request?.n ?? 0);
+  const [initial] = useState(() => (request && isServiceHomeOrigin(request.url) ? request.url : def.home));
+  // Lien profond hors de l'origine d'accueil : on monte sur l'accueil puis on charge l'URL après dom-ready.
+  const handled = useRef(request && isServiceHomeOrigin(request.url) ? request.n : 0);
   const ready = useRef(false);
 
   useEffect(() => {
     if (service !== 'teams') return;
-    void window.epihub.teamsPreloadPath().then((p) => setTeamsPreload(`file://${encodeURI(p)}`));
+    void window.epihub.teamsPreloadPath().then((p) => setTeamsPreload(p));
   }, [service]);
 
   const waiting = service === 'teams' && teamsPreload === null;

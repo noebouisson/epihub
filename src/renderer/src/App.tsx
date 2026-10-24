@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { isAllowedUrl } from '../../shared/domains';
 import type { OpenTarget, ServiceId, ServiceSnapshot, Settings } from '../../shared/types';
 import { CommandPalette } from './components/CommandPalette';
@@ -20,10 +20,13 @@ export function App(): JSX.Element {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const showToast = useCallback((m: string) => {
     setToast(m);
-    setTimeout(() => setToast(null), 3500);
+    clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 3500);
   }, []);
+  useEffect(() => () => clearTimeout(toastTimer.current), []);
 
   const select = useCallback((v: View) => {
     setView(v);

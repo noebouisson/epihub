@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { app, BrowserWindow, clipboard, Notification, safeStorage, session } from 'electron';
 import type { ServiceId } from '../shared/types';
 import { createEffects } from './app/effects';
@@ -136,12 +137,12 @@ function start(): void {
     }
   });
 
-  registerIpc({ teamsPreloadPath: TEAMS_PRELOAD_PATH, refreshTeams: () => void registry.refresh('teams').catch((err: unknown) => console.error('[epihub] teams refresh:', err instanceof Error ? err.message : String(err))), registry, effects, settings, secrets, hub, teams, writeClipboard: (t) => clipboard.writeText(t) });
+  registerIpc({ teamsPreloadPath: pathToFileURL(TEAMS_PRELOAD_PATH).href, refreshTeams: () => void registry.refresh('teams').catch((err: unknown) => console.error('[epihub] teams refresh:', err instanceof Error ? err.message : String(err))), registry, effects, settings, secrets, hub, teams, writeClipboard: (t) => clipboard.writeText(t) });
   registry.start(REFRESH_INTERVAL);
 }
 
 app.whenReady().then(() => {
-  installNavigationSecurity(TEAMS_PRELOAD_PATH);
+  installNavigationSecurity(TEAMS_PRELOAD_PATH, () => mainWindow);
   start();
   createWindow();
   app.on('activate', () => {

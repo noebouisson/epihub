@@ -16,7 +16,7 @@ interface Props {
 }
 
 export function Card({ title, service, snap, open, setView, refresh, wide, children }: Props): JSX.Element {
-  const showBody = !service || snap?.data;
+  const showBody = !service || service === 'teams' || snap?.data;
   return (
     <section className={`card${wide ? ' card-wide' : ''}`}>
       <header className="card-head">

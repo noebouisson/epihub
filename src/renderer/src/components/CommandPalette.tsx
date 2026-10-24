@@ -25,7 +25,11 @@ export function CommandPalette({ open, setView }: Props): JSX.Element | null {
       } else if (e.key === 'Escape') setShown(false);
     };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    const offPalette = window.epihub.onPalette(() => setShown((s) => !s));
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      offPalette();
+    };
   }, []);
 
   useEffect(() => {
