@@ -11,6 +11,7 @@ Les paquets sont générés dans `dist/` (voir `npm run dist`).
   chmod +x dist/EpiHub-*.AppImage
   ./dist/EpiHub-*.AppImage
   ```
+  L'AppImage nécessite FUSE 2 : `sudo apt install libfuse2` (`libfuse2t64` sur Ubuntu 24.04+). Sans FUSE, lancer avec `APPIMAGE_EXTRACT_AND_RUN=1 ./EpiHub-0.1.0.AppImage`.
 - **.deb** :
   ```bash
   sudo apt install ./dist/epihub_*.deb
@@ -27,6 +28,8 @@ npm run typecheck  # vérification TypeScript
 npm run dist       # construit l'AppImage et le .deb dans dist/
 ```
 
+Remplace le champ `homepage` de `package.json` (valeur factice requise par la cible .deb) par l'URL réelle du dépôt si tu le publies.
+
 ## Première utilisation
 
 1. Ouvrir chaque onglet (GitHub, Intra, My Epitech, Teams) et s'y connecter une fois. Les sessions sont conservées entre les lancements (partitions `persist:github`, `persist:intra`, `persist:myepitech`, `persist:teams`).
@@ -39,7 +42,7 @@ npm run dist       # construit l'AppImage et le .deb dans dist/
 - **Liens rendus ↔ dépôts** : chaque rendu de l'intra est associé à son dépôt GitHub. Une alerte est émise quand la fin est dans moins de 48 h et qu'il n'y a pas de dépôt lié ou aucun commit depuis 24 h ; elle devient *urgente* sous 6 h.
 - **Notifications de bureau** : rendus à risque, notifications GitHub, messages Teams. Une notification par rendu et par niveau, dédupliquée sur 7 jours.
 - **Recherche Ctrl+K** : palette de recherche rapide dans les rendus, dépôts et services.
-- **Partage vers Teams** : partager un élément (rendu, dépôt…) vers Teams.
+- **Partage vers Teams** : copie le titre et le lien de l'élément (rendu, dépôt…) dans le presse-papiers et ouvre l'onglet Teams ; il ne reste qu'à coller dans la conversation.
 
 ## Limites
 
