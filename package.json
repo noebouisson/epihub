@@ -4,7 +4,10 @@
   "description": "EpiHub - hub personnel GitHub, intra Epitech, My Epitech et Teams",
   "main": "./out/main/index.js",
   "private": true,
-  "author": "EpiHub",
+  "author": {
+    "name": "noebouisson",
+    "email": "187784166+noebouisson@users.noreply.github.com"
+  },
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
@@ -26,5 +29,6 @@
     "vite": "^5.4.21",
     "vitest": "^2.1.9",
     "@types/node": "^22.20.5"
-  }
+  },
+  "homepage": "https://github.com/noebouisson/epihub"
 }

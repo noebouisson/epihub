@@ -1,0 +1,15 @@
+appId: dev.epihub.app
+productName: EpiHub
+directories:
+  output: dist
+files:
+  - out/**
+linux:
+  target:
+    - AppImage
+    - deb
+  category: Office
+  icon: resources/icon.png
+  maintainer: noebouisson <187784166+noebouisson@users.noreply.github.com>
+deb:
+  packageName: epihub
