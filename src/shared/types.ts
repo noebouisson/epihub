@@ -41,6 +41,7 @@ export interface EpihubApi {
   updateSettings(patch: Partial<Settings>): Promise<Settings>
   setGithubToken(token: string): Promise<SetTokenResult>
   share(item: { title: string; url: string; context?: string }): Promise<string>
+  teamsPreloadPath(): Promise<string>
   teamsTitle(title: string): Promise<void>
   teamsNavigate(url: string): Promise<void>
   teamsNotification(n: TeamsNotificationPayload): Promise<void>

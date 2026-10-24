@@ -16,6 +16,7 @@ export interface IpcDeps {
   teams: { onTitle(t: string): void; onNavigate(u: string): void }
   writeClipboard(text: string): void
   refreshTeams(): void
+  teamsPreloadPath: string
 }
 
 const dataOf = (deps: IpcDeps): Record<ServiceId, any> => {
@@ -28,6 +29,7 @@ export function registerIpc(deps: IpcDeps): void {
   ipcMain.handle('epihub:refresh', (_e, id?: unknown) => deps.registry.refresh(isServiceId(id) ? id : undefined))
   ipcMain.handle('epihub:deadlines', () => deps.effects.deadlines(dataOf(deps)))
   ipcMain.handle('epihub:search', (_e, query: unknown) => search(buildSearchItems(dataOf(deps)), typeof query === 'string' ? query : ''))
+  ipcMain.handle('epihub:teamsPreloadPath', () => deps.teamsPreloadPath)
   ipcMain.handle('epihub:settings:get', () => deps.settings.get())
   ipcMain.handle('epihub:settings:update', (_e, patch: Partial<Settings>) => deps.settings.update(patch ?? {}))
 

@@ -4,6 +4,7 @@ import { app, BrowserWindow, clipboard, Notification, safeStorage, session } fro
 import type { ServiceId } from '../shared/types';
 import { createEffects } from './app/effects';
 import { registerIpc } from './ipc';
+import { installNavigationSecurity } from './security';
 import { createNotificationHub, type HubNotification } from './notify/notificationHub';
 import { createGithubService } from './services/github';
 import { createIntraService } from './services/intra';
@@ -15,6 +16,7 @@ import { createSecrets } from './store/secrets';
 import { createSettingsStore } from './store/settings';
 
 const REFRESH_INTERVAL = 5 * 60_000;
+const TEAMS_PRELOAD_PATH = join(__dirname, '../preload/teams-webview.js');
 let mainWindow: BrowserWindow | null = null;
 
 function createWindow(): void {
@@ -27,7 +29,8 @@ function createWindow(): void {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: true
+      sandbox: true,
+      webviewTag: true
     }
   });
   mainWindow = win;
@@ -133,11 +136,12 @@ function start(): void {
     }
   });
 
-  registerIpc({ refreshTeams: () => void registry.refresh('teams').catch((err: unknown) => console.error('[epihub] teams refresh:', err instanceof Error ? err.message : String(err))), registry, effects, settings, secrets, hub, teams, writeClipboard: (t) => clipboard.writeText(t) });
+  registerIpc({ teamsPreloadPath: TEAMS_PRELOAD_PATH, refreshTeams: () => void registry.refresh('teams').catch((err: unknown) => console.error('[epihub] teams refresh:', err instanceof Error ? err.message : String(err))), registry, effects, settings, secrets, hub, teams, writeClipboard: (t) => clipboard.writeText(t) });
   registry.start(REFRESH_INTERVAL);
 }
 
 app.whenReady().then(() => {
+  installNavigationSecurity(TEAMS_PRELOAD_PATH);
   start();
   createWindow();
   app.on('activate', () => {
