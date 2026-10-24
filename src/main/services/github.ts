@@ -18,8 +18,8 @@ export function createGithubService(
 ): Service<'github'> & { lastCommit(fullName: string, branch: string): Promise<Commit | null> } {
   const cache = new Map<string, { etag: string; body: string }>()
 
-  /** Renvoie le corps texte, ou null pour un 409 si allowConflict. */
-  async function get(path: string, allowConflict = false): Promise<any> {
+  /** Renvoie le JSON décodé, ou null si le statut fait partie de `nullOn`. */
+  async function get(path: string, nullOn: readonly number[] = []): Promise<any> {
     const token = getToken()
     if (!token) throw new NeedsLoginError('Token GitHub manquant')
     const url = API + path
@@ -33,7 +33,7 @@ export function createGithubService(
     const res = await fetch(url, { headers })
     if (res.status === 401) throw new NeedsLoginError('Token GitHub invalide')
     if (res.status === 304 && cached) return JSON.parse(cached.body)
-    if (res.status === 409 && allowConflict) return null
+    if (nullOn.includes(res.status)) return null
     if (!res.ok) throw new Error(`GitHub HTTP ${res.status}`)
     const body = await res.text()
     const etag = res.headers.get('etag')
@@ -55,7 +55,8 @@ export function createGithubService(
     async refresh(): Promise<GithubData> {
       const user = await get('/user')
       const [notifs, reviews, assigned, repos] = await Promise.all([
-        get('/notifications?per_page=50'),
+        // Les tokens fins (fine-grained) n'ont pas accès aux notifications : 403/404 → liste vide.
+        get('/notifications?per_page=50', [403, 404]).then((n) => n ?? []),
         get('/search/issues?q=is:open+is:pr+review-requested:@me&per_page=30'),
         get('/search/issues?q=is:open+is:issue+assignee:@me&per_page=30'),
         get('/user/repos?sort=pushed&per_page=100')
@@ -85,7 +86,7 @@ export function createGithubService(
       }
     },
     async lastCommit(fullName, branch): Promise<Commit | null> {
-      const list = await get(`/repos/${fullName}/commits?sha=${encodeURIComponent(branch)}&per_page=1`, true)
+      const list = await get(`/repos/${fullName}/commits?sha=${encodeURIComponent(branch)}&per_page=1`, [409])
       const c = list?.[0]
       if (!c) return null
       return {

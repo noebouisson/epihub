@@ -15,6 +15,7 @@ const api: EpihubApi = {
   getSettings: () => ipcRenderer.invoke('epihub:settings:get'),
   updateSettings: (p) => ipcRenderer.invoke('epihub:settings:update', p),
   setGithubToken: (t) => ipcRenderer.invoke('epihub:github:setToken', t),
+  clearGithubToken: () => ipcRenderer.invoke('epihub:github:clearToken'),
   share: (item) => ipcRenderer.invoke('epihub:share', item),
   teamsPreloadPath: () => ipcRenderer.invoke('epihub:teamsPreloadPath'),
   teamsTitle: (t) => ipcRenderer.invoke('epihub:teams:title', t),

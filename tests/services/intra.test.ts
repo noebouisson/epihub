@@ -6,15 +6,17 @@ import { NeedsLoginError, type FetchLike } from '../../src/main/services/types'
 const fx = (n: string): string => readFileSync(`tests/fixtures/intra/${n}`, 'utf8')
 
 let serveLoginHtml: boolean
+let boardOverride: string | null
 let status: number
 const fakeFetch: FetchLike = async (url) => {
-  const body = serveLoginHtml ? fx('login.html') : url.includes('/user/') ? fx('user.json') : fx('board.json')
+  const body = serveLoginHtml ? fx('login.html') : url.includes('/user/') ? fx('user.json') : (boardOverride ?? fx('board.json'))
   return { status, ok: status < 400, headers: { get: () => null }, text: async () => body }
 }
 
 let intra: ReturnType<typeof createIntraService>
 beforeEach(() => {
   serveLoginHtml = false
+  boardOverride = null
   status = 200
   intra = createIntraService(fakeFetch)
 })
@@ -51,5 +53,13 @@ describe('intra service', () => {
   test('statut 403 → NeedsLoginError', async () => {
     status = 403
     await expect(intra.refresh()).rejects.toBeInstanceOf(NeedsLoginError)
+  })
+  test('projets présents mais aucune date lisible → erreur explicite', async () => {
+    boardOverride = JSON.stringify({ board: { projets: [{ title: 'X', title_link: '/planning/', timeline_end: 'demain', id_activite: '1' }], activites: [] }, history: [] })
+    await expect(intra.refresh()).rejects.toThrow('Format de date intranet inconnu')
+  })
+  test('aucun projet → pas d’erreur', async () => {
+    boardOverride = JSON.stringify({ board: { projets: [], activites: [] }, history: [] })
+    expect((await intra.refresh()).deadlines).toEqual([])
   })
 })

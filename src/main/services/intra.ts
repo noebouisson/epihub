@@ -53,7 +53,8 @@ export function createIntraService(fetch: FetchLike): Service<'intra'> {
       const [user, board] = await Promise.all([getJson(fetch, '/user/?format=json'), getJson(fetch, '/?format=json')])
 
       const deadlines: Deadline[] = []
-      for (const p of board.board?.projets ?? []) {
+      const projets: any[] = board.board?.projets ?? []
+      for (const p of projets) {
         const end = safeDate(p.timeline_end)
         if (!end) continue
         deadlines.push({
@@ -65,6 +66,8 @@ export function createIntraService(fetch: FetchLike): Service<'intra'> {
           url: BASE + p.title_link
         })
       }
+      // Aucune date lisible alors qu'il y a des projets : le format a changé, on le signale.
+      if (projets.length > 0 && deadlines.length === 0) throw new Error('Format de date intranet inconnu')
 
       const events: IntraEvent[] = []
       for (const a of board.board?.activites ?? []) {

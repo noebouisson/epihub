@@ -10,6 +10,8 @@ interface Props {
   open: OpenFn;
 }
 
+const TOKEN_URL = 'https://github.com/settings/tokens/new?scopes=repo,notifications,read:user&description=EpiHub';
+
 const STATE_LABEL = { loading: 'Chargement…', ok: 'Connecté', 'needs-login': 'Connexion requise', error: 'Erreur' } as const;
 
 export function Settings({ snapshot, settings, onSettings, open }: Props): JSX.Element {
@@ -27,6 +29,12 @@ export function Settings({ snapshot, settings, onSettings, open }: Props): JSX.E
     }
   };
 
+  const clear = async (): Promise<void> => {
+    await window.epihub.clearGithubToken();
+    setToken('');
+    setMessage({ ok: true, text: 'Token supprimé.' });
+  };
+
   const links = settings ? Object.entries(settings.repoLinks) : [];
 
   return (
@@ -39,6 +47,13 @@ export function Settings({ snapshot, settings, onSettings, open }: Props): JSX.E
             <div className="form-row">
               <input className="input" type="password" autoComplete="off" placeholder="ghp_…" value={token} onChange={(e) => setToken(e.target.value)} />
               <button type="button" className="btn btn-primary" disabled={!token.trim()} onClick={() => void save()}>Enregistrer</button>
+            </div>
+            <p className="dim">
+              Crée un token classique avec les droits repo, notifications et read:user —{' '}
+              <a href={TOKEN_URL} onClick={(e) => { e.preventDefault(); open('github', TOKEN_URL); }}>créer le token sur GitHub</a>
+            </p>
+            <div className="form-row">
+              <button type="button" className="btn btn-small btn-danger" onClick={() => void clear()}>Supprimer le token</button>
             </div>
             {message && <p className={message.ok ? 'ok' : 'bad'}>{message.text}</p>}
           </div>

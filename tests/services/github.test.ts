@@ -8,6 +8,7 @@ const fx = (n: string): string => readFileSync(`tests/fixtures/github/${n}.json`
 let calls: { url: string; headers: Record<string, string> }[]
 let status401: boolean
 let force304: boolean
+let notifStatus: number
 
 const fakeFetch: FetchLike = async (url, init) => {
   const headers = init?.headers ?? {}
@@ -21,6 +22,7 @@ const fakeFetch: FetchLike = async (url, init) => {
   if (status401) return res(401, '{}')
   if (force304) return res(304, '')
   if (url.includes('/repos/me/empty/commits')) return res(409, '{}')
+  if (url.includes('/notifications') && notifStatus !== 200) return res(notifStatus, '{"message":"Resource not accessible by personal access token"}')
   let body: string
   if (url.endsWith('/user')) body = fx('user')
   else if (url.includes('/notifications')) body = fx('notifications')
@@ -37,6 +39,7 @@ beforeEach(() => {
   calls = []
   status401 = false
   force304 = false
+  notifStatus = 200
   svc = createGithubService(fakeFetch, () => 'ghp_test')
 })
 
@@ -68,6 +71,17 @@ describe('github service', () => {
     force304 = true
     expect((await svc.refresh()).repos).toHaveLength(2)
     expect(calls.at(-1)?.headers['If-None-Match']).toBe('W/"etag-1"')
+  })
+  test.each([403, 404])('token fin : notifications %i → liste vide, le reste est gardé', async (st) => {
+    notifStatus = st
+    const d = await svc.refresh()
+    expect(d.notifications).toEqual([])
+    expect(d.repos).toHaveLength(2)
+    expect(d.reviewRequests).toHaveLength(1)
+  })
+  test('notifications en 500 → erreur (inchangé)', async () => {
+    notifStatus = 500
+    await expect(svc.refresh()).rejects.toThrow('GitHub HTTP 500')
   })
   test('lastCommit renvoie le dernier commit', async () => {
     expect(await svc.lastCommit('me/r', 'main')).toMatchObject({ sha: 'abc123', author: 'Octocat', message: 'init' })

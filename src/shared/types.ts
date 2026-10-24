@@ -40,6 +40,7 @@ export interface EpihubApi {
   getSettings(): Promise<Settings>
   updateSettings(patch: Partial<Settings>): Promise<Settings>
   setGithubToken(token: string): Promise<SetTokenResult>
+  clearGithubToken(): Promise<void>
   share(item: { title: string; url: string; context?: string }): Promise<string>
   /** URL file: canonique du preload Teams. */
   teamsPreloadPath(): Promise<string>
