@@ -23,7 +23,15 @@ export function parseTitleLink(link: string): { moduleCode: string; projectCode:
   return { moduleCode: m[1], projectCode: '' }
 }
 
-const stripTags = (s: string): string => s.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim()
+const ENTITIES: Record<string, string> = { nbsp: ' ', amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'" }
+
+/** Décode les entités HTML courantes (nommées et numériques) en une seule passe. */
+const decodeEntities = (s: string): string =>
+  s.replace(/&(#\d+|[a-z]+);/gi, (m, e: string) =>
+    e[0] === '#' ? (ENTITIES[e] ?? String.fromCodePoint(+e.slice(1))) : (ENTITIES[e.toLowerCase()] ?? m)
+  )
+
+const stripTags = (s: string): string => decodeEntities(s.replace(/<[^>]*>/g, '')).replace(/\s+/g, ' ').trim()
 
 function safeDate(s: string): string | null {
   try {

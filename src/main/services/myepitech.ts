@@ -98,20 +98,33 @@ export function createMyEpitechService(
       const entries = await apiJson(`https://api.epitest.eu/me/${year}/${encodeURIComponent(module)}/${encodeURIComponent(slug)}`)
       if (!Array.isArray(entries)) throw new Error(BAD_FORMAT)
       const runs = entries.map((e): TestRun => {
-        if (typeof e?.date !== 'string' || !e.results || typeof e.results !== 'object') throw new Error(BAD_FORMAT)
-        return { id: String(e.results.testRunId ?? e.id), date: e.date, percent: percentOf(e.results.skills) }
+        const id = e?.results?.testRunId ?? e?.id
+        if (id == null || typeof e.date !== 'string' || Number.isNaN(Date.parse(e.date)) || !e.results || typeof e.results !== 'object') {
+          throw new Error(BAD_FORMAT)
+        }
+        return { id: String(id), date: e.date, percent: percentOf(e.results.skills) }
       })
       return runs.sort((a, b) => Date.parse(a.date) - Date.parse(b.date))
     },
     async runDetails(testRunId): Promise<SkillReport[]> {
       const json = await apiJson(`https://api.epitest.eu/me/details/${encodeURIComponent(testRunId)}`)
       const skills = json?.results?.skills ?? json?.skills
-      if (!Array.isArray(skills)) throw new Error(BAD_FORMAT)
-      return skills.map((s): SkillReport => {
-        const r = s?.FullSkillReport
-        if (typeof r?.name !== 'string' || !Array.isArray(r.tests)) throw new Error(BAD_FORMAT)
-        const tests = r.tests.map((t: any) => ({ name: String(t.name), passed: t.passed === true, crashed: t.crashed === true }))
-        return { name: r.name, passed: tests.filter((t: { passed: boolean }) => t.passed).length, count: tests.length, tests }
+      // Tableau, ou objet indexé par nom de compétence ; chaque valeur : { FullSkillReport: {...} } ou directement {...}.
+      const entries: [string | undefined, any][] = Array.isArray(skills)
+        ? skills.map((v) => [undefined, v])
+        : skills && typeof skills === 'object'
+          ? Object.entries(skills)
+          : []
+      if (entries.length === 0 && !Array.isArray(skills)) throw new Error(BAD_FORMAT)
+      return entries.map(([key, v]): SkillReport => {
+        const r = v?.FullSkillReport ?? v
+        const name = typeof r?.name === 'string' ? r.name : key
+        if (typeof name !== 'string' || !Array.isArray(r?.tests)) throw new Error(BAD_FORMAT)
+        const tests = r.tests.map((t: any) => {
+          if (typeof t?.name !== 'string') throw new Error(BAD_FORMAT)
+          return { name: t.name, passed: t.passed === true, crashed: t.crashed === true }
+        })
+        return { name, passed: tests.filter((t: { passed: boolean }) => t.passed).length, count: tests.length, tests }
       })
     }
   }

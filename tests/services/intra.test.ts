@@ -75,10 +75,24 @@ const PROJECT_URL = 'https://intra.epitech.eu/module/2026/G-CPE-100/LYN-0-1/acti
 describe('intra projectDetails', () => {
   test('projectDetails : description sans balises et fichiers absolus', async () => {
     const s = await intra.projectDetails(PROJECT_URL)
-    expect(s.description).not.toContain('<')
+    expect(s.description).not.toContain('<p>')
+    expect(s.description).not.toContain('&nbsp;')
+    expect(s.description).toBe('Écrire cinq fonctions en C & <stdio.h> "ok" l\'aé. my_putchar')
     expect(s.files[0].url).toBe('https://intra.epitech.eu/module/2026/G-CPE-100/LYN-0-1/acti-123/project/file/sujet.pdf')
     expect(s.files.every((f) => f.url.startsWith('https://intra.epitech.eu/'))).toBe(true) // fullpath relatif ignoré
     expect(s.files).toHaveLength(1)
+  })
+  test('projectDetails : URLs demandées', async () => {
+    const urls: string[] = []
+    const f: FetchLike = async (url) => {
+      urls.push(url)
+      return { status: 200, ok: true, headers: { get: () => null }, text: async () => (url.includes('/file/') ? '[]' : fx('project.json')) }
+    }
+    await createIntraService(f).projectDetails(PROJECT_URL)
+    expect(urls.sort()).toEqual([PROJECT_URL + '?format=json', PROJECT_URL + 'file/?format=json'].sort())
+  })
+  test('projectDetails : hôte déguisé refusé', async () => {
+    await expect(intra.projectDetails('https://intra.epitech.eu.evil.com/x')).rejects.toThrow('URL intranet invalide')
   })
   test('projectDetails : URL hors intranet refusée', async () => {
     await expect(intra.projectDetails('https://evil.com/x')).rejects.toThrow('URL intranet invalide')

@@ -105,7 +105,8 @@ export function createGithubService(
     },
     recentCommits: (fullName, branch) => commitsOf(fullName, branch, 5),
     async openPulls(fullName): Promise<PullSummary[]> {
-      const list: any[] = await get(`/repos/${fullName}/pulls?state=open&per_page=10`)
+      const list = await get(`/repos/${fullName}/pulls?state=open&per_page=10`)
+      if (!Array.isArray(list)) throw new Error('GitHub: réponse inattendue')
       return list.map((p) => ({
         number: p.number,
         title: p.title,

@@ -100,6 +100,10 @@ describe('github service', () => {
   test('recentCommits : repo vide (409) → []', async () => {
     expect(await svc.recentCommits('me/empty', 'main')).toEqual([])
   })
+  test('openPulls : corps non tableau → erreur', async () => {
+    const odd: FetchLike = async () => ({ status: 200, ok: true, headers: { get: () => null }, text: async () => '{"a":1}' })
+    await expect(createGithubService(odd, () => 't').openPulls('me/r')).rejects.toThrow('GitHub: réponse inattendue')
+  })
   test('openPulls', async () => {
     expect((await svc.openPulls('me/r'))[0]).toMatchObject({
       number: 3, title: 'Add day 01', url: 'https://github.com/me/r/pull/3', author: 'octocat', updatedAt: '2026-10-24T11:00:00Z'

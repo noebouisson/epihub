@@ -106,6 +106,21 @@ describe('my epitech à la demande', () => {
   test('runDetails : format inattendu → erreur claire', async () => {
     await expect(createMyEpitechService(mk('{"results":{}}'), async () => 't', now).runDetails('42')).rejects.toThrow('Format My Epitech inattendu')
   })
+  test('runDetails : skills en objet indexé par nom', async () => {
+    const obj = readFileSync('tests/fixtures/myepitech/details-object.json', 'utf8')
+    const d = await createMyEpitechService(mk(obj), async () => 't', now).runDetails('43')
+    expect(d).toMatchObject([{ name: 'basics', passed: 2, count: 2 }, { name: 'edge cases', passed: 0, count: 1 }])
+    expect(d[1].tests[0].crashed).toBe(true)
+  })
+  test('runDetails : test sans nom → erreur claire', async () => {
+    const bad = '{"results":{"skills":[{"FullSkillReport":{"name":"a","tests":[{"passed":true}]}}]}}'
+    await expect(createMyEpitechService(mk(bad), async () => 't', now).runDetails('1')).rejects.toThrow('Format My Epitech inattendu')
+  })
+  test('history : sans id ni testRunId, ou date illisible → erreur claire', async () => {
+    for (const body of ['[{"date":"2026-10-24T10:00:00Z","results":{}}]', '[{"id":"x","date":"hier","results":{}}]']) {
+      await expect(createMyEpitechService(mk(body), async () => 't', now).history('M', 'x')).rejects.toThrow('Format My Epitech inattendu')
+    }
+  })
   test('runDetails : 401 → NeedsLoginError', async () => {
     await expect(createMyEpitechService(mk('{}', 401), async () => 't', now).runDetails('42')).rejects.toBeInstanceOf(NeedsLoginError)
   })
