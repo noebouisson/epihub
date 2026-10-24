@@ -1,0 +1,4 @@
+[
+  {"id":"n1","updated_at":"2026-10-24T09:00:00Z","subject":{"title":"Fix parser","type":"PullRequest","url":"https://api.github.com/repos/me/r/pulls/3"},"repository":{"full_name":"me/r","html_url":"https://github.com/me/r"}},
+  {"id":"n2","updated_at":"2026-10-24T08:00:00Z","subject":{"title":"Bug in lexer","type":"Issue","url":"https://api.github.com/repos/me/r/issues/7"},"repository":{"full_name":"me/r","html_url":"https://github.com/me/r"}}
+]
