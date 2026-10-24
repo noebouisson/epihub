@@ -59,3 +59,58 @@ h2 { font-size: 15px; margin: 0; }
 .content { flex: 1; min-width: 0; position: relative; display: flex; flex-direction: column; }
 .service-view { flex: 1; width: 100%; height: 100%; border: 0; }
 .page { padding: 24px 28px; overflow-y: auto; height: 100%; }
+
+/* Pages et cartes */
+.page-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; align-items: start; }
+.stack { display: flex; flex-direction: column; gap: 16px; max-width: 760px; }
+.card { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; min-width: 0; }
+.card-wide { grid-column: 1 / -1; }
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.sub { font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-dim); margin: 12px 0 4px; }
+.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.row { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-top: 1px solid var(--border); }
+.row:first-child { border-top: 0; }
+.row-main { flex: 1; min-width: 0; }
+.row-warning { box-shadow: inset 3px 0 0 var(--warn); padding-left: 10px; }
+.row-urgent { box-shadow: inset 3px 0 0 var(--danger); padding-left: 10px; }
+.dim { color: var(--text-dim); }
+.small { font-size: 12px; }
+.ok { color: var(--ok); }
+.bad { color: var(--danger); }
+.big { font-size: 28px; font-weight: 700; margin: 0 0 8px; display: block; }
+.stats { display: flex; gap: 32px; }
+.stats > div { display: flex; flex-direction: column; }
+.pad { padding: 12px; }
+.tag { background: var(--bg-hover); border-radius: 6px; padding: 1px 7px; font-size: 11px; color: var(--text-dim); }
+.link { background: none; border: 0; padding: 0; color: var(--accent); text-align: left; }
+.link:hover { text-decoration: underline; }
+
+.btn { background: var(--bg-hover); border: 1px solid var(--border); border-radius: 8px; padding: 7px 14px; }
+.btn:hover:not(:disabled) { border-color: var(--accent); }
+.btn:disabled { opacity: 0.5; cursor: default; }
+.btn-small { padding: 3px 10px; font-size: 12px; }
+.btn-primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+.btn-danger { color: var(--danger); }
+.btn-ghost { background: transparent; }
+.input { width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font: inherit; }
+.input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.form-row { display: flex; gap: 8px; }
+.switch { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-dim); }
+
+.badge { display: inline-block; border-radius: 999px; padding: 1px 9px; font-size: 11px; margin-left: 6px; }
+.badge-group { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.badge-dim { background: var(--bg-hover); color: var(--text-dim); margin-left: 0; }
+.badge-ok { background: color-mix(in srgb, var(--ok) 20%, transparent); color: var(--ok); }
+.badge-warn { background: color-mix(in srgb, var(--warn) 22%, transparent); color: var(--warn); }
+.badge-danger { background: color-mix(in srgb, var(--danger) 20%, transparent); color: var(--danger); margin-left: 0; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Modales, palette, toast */
+.overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); display: grid; place-items: center; z-index: 50; }
+.overlay-top { place-items: start center; padding-top: 12vh; }
+.modal { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; width: min(560px, 92vw); display: flex; flex-direction: column; gap: 10px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5); }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.picker-list, .palette-list { max-height: 50vh; overflow-y: auto; }
+.list-btn { width: 100%; text-align: left; background: transparent; border: 0; border-radius: 8px; padding: 8px 10px; }
+.list-btn:hover, .list-btn.selected { background: var(--bg-hover); }
+.toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); background: var(--accent); color: var(--accent-text); padding: 10px 18px; border-radius: 10px; z-index: 60; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4); }

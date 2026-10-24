@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { isAllowedUrl } from '../../shared/domains';
 import type { OpenTarget, ServiceId, ServiceSnapshot, Settings } from '../../shared/types';
+import { CommandPalette } from './components/CommandPalette';
 import { ServiceView, type OpenRequest } from './components/ServiceView';
 import { Sidebar } from './components/Sidebar';
+import { Home } from './pages/Home';
+import { Settings as SettingsPage } from './pages/Settings';
 import { SERVICES, type View } from './services';
 import './styles/app.css';
 
@@ -15,6 +18,12 @@ export function App(): JSX.Element {
   const [requests, setRequests] = useState<Partial<Record<ServiceId, OpenRequest>>>({});
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [settings, setSettings] = useState<Settings | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+
+  const showToast = useCallback((m: string) => {
+    setToast(m);
+    setTimeout(() => setToast(null), 3500);
+  }, []);
 
   const select = useCallback((v: View) => {
     setView(v);
@@ -49,12 +58,14 @@ export function App(): JSX.Element {
     <div className="app">
       <Sidebar view={view} snapshot={snapshot} onSelect={select} />
       <main className="content">
-        {view === 'home' && <div className="page"><h1>Accueil</h1></div>}
-        {view === 'settings' && <div className="page"><h1>Réglages</h1></div>}
+        {view === 'home' && <Home snapshot={snapshot} settings={settings} onSettings={setSettings} open={open} setView={select} toast={showToast} />}
+        {view === 'settings' && <SettingsPage snapshot={snapshot} settings={settings} onSettings={setSettings} open={open} />}
         {SERVICES.filter((s) => mounted.has(s.id)).map((s) => (
           <ServiceView key={s.id} service={s.id} visible={view === s.id} request={requests[s.id]} />
         ))}
       </main>
+      <CommandPalette open={open} setView={select} />
+      {toast && <div className="toast" role="status">{toast}</div>}
     </div>
   );
 }
