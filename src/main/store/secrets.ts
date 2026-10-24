@@ -7,6 +7,15 @@ export interface SecretCrypto {
   decryptString(b: Buffer): string;
 }
 
+/**
+ * Chiffrement réellement utilisable : sous Linux, le backend `basic_text` chiffre avec une clé
+ * codée en dur (aucune protection) → on le considère indisponible.
+ */
+export function isEncryptionUsable(platform: string, available: boolean, backend: string | undefined): boolean {
+  if (!available) return false;
+  return !(platform === 'linux' && backend === 'basic_text');
+}
+
 export function createSecrets(
   filePath: string,
   crypto: SecretCrypto
