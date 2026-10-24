@@ -1,8 +1,9 @@
 import { app, shell, type BrowserWindow, type WebContents } from 'electron';
-import { isServiceHomeOrigin, isAllowedUrl } from '../shared/domains';
-import { classifyPreload, isPaletteShortcut, popupDecision } from './navigationPolicy';
+import { isServiceHomeOrigin } from '../shared/domains';
+import { classifyPreload, guestNavigation, isPaletteShortcut, popupPolicy } from './navigationPolicy';
+import { SERVICE_PARTITIONS } from './securityPolicy';
 
-const PARTITIONS = ['persist:github', 'persist:intra', 'persist:myepitech', 'persist:teams'];
+const PARTITIONS: readonly string[] = SERVICE_PARTITIONS;
 
 const openExternal = (url: string): void => {
   try {
@@ -13,34 +14,43 @@ const openExternal = (url: string): void => {
   }
 };
 
+type NavEvent = { preventDefault(): void; isMainFrame?: boolean; url?: string };
+
 /**
  * Sécurité des contenus web. La fenêtre principale est identifiée par son id ; TOUT autre
- * webContents (webviews et popups de connexion) reçoit le garde-fou : navigation limitée aux
- * domaines des services, le reste part dans le navigateur système.
+ * webContents (webviews et popups de connexion) reçoit le garde-fou : navigation du cadre principal
+ * limitée aux domaines des services, le reste part dans le navigateur système.
  */
 export function installNavigationSecurity(teamsPreloadPath: string, getMainWindow: () => BrowserWindow | null): void {
   const isMain = (c: WebContents): boolean => getMainWindow()?.webContents.id === c.id;
 
   app.on('web-contents-created', (_e, contents: WebContents) => {
-    const guard = (event: { preventDefault(): void }, url: string): void => {
+    // Electron 33 : `event.isMainFrame` (et l'argument positionnel déprécié, en repli).
+    const guard = (event: NavEvent, url: string, _inPlace?: boolean, isMainFrameArg?: boolean): void => {
       if (isMain(contents)) return;
-      if (!isAllowedUrl(url)) {
+      const mainFrame = event.isMainFrame ?? isMainFrameArg ?? true;
+      if (guestNavigation(url, mainFrame) === 'external') {
         event.preventDefault();
         openExternal(url);
       }
     };
-    contents.on('will-navigate', (event, url) => {
+    contents.on('will-navigate', (event, url, inPlace, isMainFrameArg) => {
       if (isMain(contents)) {
         if (url !== contents.getURL()) {
           event.preventDefault();
           openExternal(url);
         }
-      } else guard(event, url);
+      } else guard(event, url, inPlace, isMainFrameArg);
     });
-    contents.on('will-redirect', guard);
+    contents.on('will-redirect', (event, url, inPlace, isMainFrameArg) => guard(event, url, inPlace, isMainFrameArg));
 
     contents.setWindowOpenHandler(({ url }) => {
-      if (!isMain(contents) && popupDecision(url) === 'allow') {
+      if (isMain(contents)) {
+        openExternal(url);
+        return { action: 'deny' };
+      }
+      const decision = popupPolicy(url);
+      if (decision === 'popup') {
         return {
           action: 'allow',
           overrideBrowserWindowOptions: {
@@ -49,7 +59,8 @@ export function installNavigationSecurity(teamsPreloadPath: string, getMainWindo
           }
         };
       }
-      openExternal(url);
+      if (decision === 'same-view') void contents.loadURL(url).catch(() => undefined);
+      else openExternal(url);
       return { action: 'deny' };
     });
 

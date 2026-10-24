@@ -13,6 +13,15 @@ export class NeedsLoginError extends Error {
   }
 }
 
+/** Le service n'a pas encore de données à lire (ex. Teams pas encore chargé) : état `loading`. */
+export class NotReadyError extends Error {
+  constructor(message = 'Pas encore prêt') {
+    super(message)
+    this.name = 'NotReadyError'
+    Object.setPrototypeOf(this, NotReadyError.prototype)
+  }
+}
+
 export interface Service<K extends ServiceId> {
   id: K
   refresh(): Promise<ServiceDataMap[K]>

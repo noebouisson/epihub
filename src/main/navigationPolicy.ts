@@ -19,9 +19,38 @@ export function classifyPreload(candidates: (string | undefined)[], teamsPreload
   return given.every((g) => preloadToPath(g) === expected) ? 'teams' : 'reject';
 }
 
-/** Une fenêtre ouverte depuis un invité : autorisée seulement vers les domaines des services. */
-export function popupDecision(url: string): 'allow' | 'deny' {
-  return isAllowedUrl(url) ? 'allow' : 'deny';
+const AUTH_POPUP_HOSTS = new Set(['login.microsoftonline.com', 'login.live.com', 'login.microsoft.com']);
+
+/** Fenêtre de connexion légitime (OAuth Microsoft ou GitHub). */
+export function isAuthPopupUrl(raw: string): boolean {
+  let u: URL;
+  try {
+    u = new URL(raw);
+  } catch {
+    return false;
+  }
+  if (u.protocol !== 'https:') return false;
+  const host = u.hostname.toLowerCase();
+  if (AUTH_POPUP_HOSTS.has(host)) return true;
+  return host === 'github.com' && /^\/(login|session)(\/|$)/.test(u.pathname);
+}
+
+/**
+ * window.open / target=_blank depuis un invité : 'popup' = nouvelle fenêtre (connexion uniquement),
+ * 'same-view' = chargé dans la même webview, 'external' = navigateur système.
+ */
+export function popupPolicy(url: string): 'popup' | 'same-view' | 'external' {
+  if (isAuthPopupUrl(url)) return 'popup';
+  return isAllowedUrl(url) ? 'same-view' : 'external';
+}
+
+/**
+ * Navigation (will-navigate / will-redirect) d'un invité : les sous-cadres (iframes) sont laissés
+ * passer sans bruit ; seul le cadre principal est limité aux domaines des services.
+ */
+export function guestNavigation(url: string, isMainFrame: boolean): 'allow' | 'external' {
+  if (!isMainFrame) return 'allow';
+  return isAllowedUrl(url) ? 'allow' : 'external';
 }
 
 export function isPaletteShortcut(input: { type: string; control?: boolean; meta?: boolean; key: string }): boolean {

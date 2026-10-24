@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { createRegistry } from '../../src/main/services/registry'
-import { NeedsLoginError, type Service } from '../../src/main/services/types'
+import { NeedsLoginError, NotReadyError, type Service } from '../../src/main/services/types'
 import type { ServiceDataMap, ServiceId } from '../../src/shared/types'
 
 const ghEmpty = { login: '', notifications: [], reviewRequests: [], assignedIssues: [], repos: [] }
@@ -70,5 +70,30 @@ describe('registre des services', () => {
     stop()
     await vi.advanceTimersByTimeAsync(600_000)
     expect(refresh).toHaveBeenCalledTimes(3) // démarrage + 2
+  })
+
+  test('NotReadyError → état loading, pas erreur', async () => {
+    const reg = createRegistry({ ...all(), teams: failing('teams', new NotReadyError('Teams pas encore ouvert')) }, { now: () => 1, onChange: vi.fn() })
+    await reg.refresh('teams')
+    expect(reg.snapshot().teams.status.state).toBe('loading')
+  })
+
+  test('amorcé depuis le cache : loading avec données et ancienne date', async () => {
+    const reg = createRegistry(all(), { now: () => 50, onChange: vi.fn(), initial: { teams: { data: { unread: 7 }, updatedAt: 10 } } })
+    expect(reg.snapshot().teams).toEqual({ status: { state: 'loading', updatedAt: 10 }, data: { unread: 7 } })
+    expect(reg.snapshot().github).toEqual({ status: { state: 'loading' }, data: null })
+    await reg.refresh('teams')
+    expect(reg.snapshot().teams).toEqual({ status: { state: 'ok', updatedAt: 50 }, data: { unread: 0 } })
+  })
+
+  test('une erreur garde la date des données conservées', async () => {
+    const svc = toggling({ unread: 4 })
+    let t = 5
+    const reg = createRegistry({ ...all(), teams: svc }, { now: () => t, onChange: vi.fn() })
+    await reg.refresh('teams')
+    svc.fail = true
+    t = 9
+    await reg.refresh('teams')
+    expect(reg.snapshot().teams.status).toEqual({ state: 'error', message: 'down', updatedAt: 5 })
   })
 })

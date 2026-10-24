@@ -13,8 +13,10 @@ interface Props {
 const hhmm = (ts: number): string => new Date(ts).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
 export function StatusBadge({ service, snap, open, setView, refresh }: Props): JSX.Element | null {
-  if (!snap || snap.status.state === 'loading') return <span className="badge badge-dim">Chargement…</span>;
+  if (!snap) return <span className="badge badge-dim">Chargement…</span>;
   const stale = snap.data && snap.status.updatedAt ? <span className="badge badge-dim">données de {hhmm(snap.status.updatedAt)}</span> : null;
+  // Au lancement, les données du cache s'affichent tout de suite avec leur date.
+  if (snap.status.state === 'loading') return <span className="badge-group">{stale}<span className="badge badge-dim">Chargement…</span></span>;
   switch (snap.status.state) {
     case 'needs-login':
       return (

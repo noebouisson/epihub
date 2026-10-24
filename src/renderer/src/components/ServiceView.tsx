@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { isAllowedUrl, isServiceHomeOrigin } from '../../../shared/domains';
-import type { ServiceId, TeamsNotificationPayload } from '../../../shared/types';
+import { isAllowedUrl, isServiceHomeOrigin, shouldRefreshAfterLogin } from '../../../shared/domains';
+import type { ServiceId, ServiceState, TeamsNotificationPayload } from '../../../shared/types';
 import { SERVICES } from '../services';
 
 export interface OpenRequest {
@@ -12,12 +12,19 @@ interface Props {
   service: ServiceId;
   visible: boolean;
   request?: OpenRequest;
+  /** État du service dans l'accueil (pour rafraîchir juste après une connexion). */
+  state?: ServiceState;
 }
 
-type WebviewEl = HTMLElement & { loadURL(url: string): Promise<void> };
+type WebviewEl = HTMLElement & { loadURL(url: string): Promise<void>; getURL(): string };
+
+const LOGIN_REFRESH_DELAY = 2000;
+
+// Masquée sans display:none : la webview reste dimensionnée et chargée (utile pour Teams monté au lancement).
+const HIDDEN_STYLE = { display: 'flex', position: 'absolute', inset: 0, visibility: 'hidden', pointerEvents: 'none', zIndex: -1 } as const;
 
 /** Une webview par service, montée au premier affichage puis seulement masquée. */
-export function ServiceView({ service, visible, request }: Props): JSX.Element | null {
+export function ServiceView({ service, visible, request, state }: Props): JSX.Element | null {
   const def = SERVICES.find((s) => s.id === service)!;
   const ref = useRef<WebviewEl | null>(null);
   const [teamsPreload, setTeamsPreload] = useState<string | null>(null);
@@ -25,6 +32,8 @@ export function ServiceView({ service, visible, request }: Props): JSX.Element |
   // Lien profond hors de l'origine d'accueil : on monte sur l'accueil puis on charge l'URL après dom-ready.
   const handled = useRef(request && isServiceHomeOrigin(request.url) ? request.n : 0);
   const ready = useRef(false);
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
   useEffect(() => {
     if (service !== 'teams') return;
@@ -40,7 +49,30 @@ export function ServiceView({ service, visible, request }: Props): JSX.Element |
       ready.current = true;
     };
     wv.addEventListener('dom-ready', onReady);
-    const cleanups: (() => void)[] = [() => wv.removeEventListener('dom-ready', onReady)];
+    // Retour sur l'origine du service alors que l'accueil indique « connexion requise » :
+    // l'utilisateur vient de se connecter → rafraîchissement (regroupé sur 2 s).
+    let loginTimer: ReturnType<typeof setTimeout> | undefined;
+    const onLoaded = (): void => {
+      let url = '';
+      try {
+        url = wv.getURL();
+      } catch {
+        return;
+      }
+      if (!shouldRefreshAfterLogin(service, url, stateRef.current)) return;
+      clearTimeout(loginTimer);
+      loginTimer = setTimeout(() => {
+        if (stateRef.current === 'needs-login') void window.epihub.refresh(service);
+      }, LOGIN_REFRESH_DELAY);
+    };
+    wv.addEventListener('did-navigate', onLoaded);
+    wv.addEventListener('did-stop-loading', onLoaded);
+    const cleanups: (() => void)[] = [
+      () => wv.removeEventListener('dom-ready', onReady),
+      () => wv.removeEventListener('did-navigate', onLoaded),
+      () => wv.removeEventListener('did-stop-loading', onLoaded),
+      () => clearTimeout(loginTimer)
+    ];
     if (service === 'teams') {
       const on = <E extends Event>(name: string, fn: (e: E) => void): void => {
         wv.addEventListener(name, fn as EventListener);
@@ -72,7 +104,7 @@ export function ServiceView({ service, visible, request }: Props): JSX.Element |
     <webview
       ref={ref as never}
       className="service-view"
-      style={{ display: visible ? 'flex' : 'none' }}
+      style={visible ? { display: 'flex' } : HIDDEN_STYLE}
       partition={def.partition}
       src={initial}
       {...({ allowpopups: 'true' } as object)}

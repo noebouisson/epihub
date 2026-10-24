@@ -14,7 +14,8 @@ export type OpenFn = (service: ServiceId | 'app', url?: string) => void;
 
 export function App(): JSX.Element {
   const [view, setView] = useState<View>('home');
-  const [mounted, setMounted] = useState<Set<ServiceId>>(new Set());
+  // Teams est monté (caché) dès le lancement : non-lus et notifications disponibles sans ouvrir l'onglet.
+  const [mounted, setMounted] = useState<Set<ServiceId>>(() => new Set<ServiceId>(['teams']));
   const [requests, setRequests] = useState<Partial<Record<ServiceId, OpenRequest>>>({});
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -64,7 +65,7 @@ export function App(): JSX.Element {
         {view === 'home' && <Home snapshot={snapshot} settings={settings} onSettings={setSettings} open={open} setView={select} toast={showToast} />}
         {view === 'settings' && <SettingsPage snapshot={snapshot} settings={settings} onSettings={setSettings} open={open} />}
         {SERVICES.filter((s) => mounted.has(s.id)).map((s) => (
-          <ServiceView key={s.id} service={s.id} visible={view === s.id} request={requests[s.id]} />
+          <ServiceView key={s.id} service={s.id} visible={view === s.id} request={requests[s.id]} state={snapshot?.[s.id].status.state} />
         ))}
       </main>
       <CommandPalette open={open} setView={select} />

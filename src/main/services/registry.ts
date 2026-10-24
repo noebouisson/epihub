@@ -1,5 +1,5 @@
 import type { ServiceId, ServiceSnapshot } from '../../shared/types'
-import { NeedsLoginError, type Service } from './types'
+import { NeedsLoginError, NotReadyError, type Service } from './types'
 
 type Services = { [K in ServiceId]: Service<K> }
 type Snapshots = { [K in ServiceId]: ServiceSnapshot<K> }
@@ -7,17 +7,19 @@ type Snapshots = { [K in ServiceId]: ServiceSnapshot<K> }
 export interface RegistryOptions {
   now(): number
   onChange(id: ServiceId, snap: ServiceSnapshot): void
+  /** Données mises en cache au lancement précédent : affichées en `loading` avec leur ancienne date. */
+  initial?: Partial<{ [K in ServiceId]: { data: ServiceSnapshot<K>['data']; updatedAt?: number } }>
 }
 
 const IDS: ServiceId[] = ['github', 'intra', 'myepitech', 'teams']
 
 export function createRegistry(services: Services, opts: RegistryOptions) {
-  const state: Snapshots = {
-    github: { status: { state: 'loading' }, data: null },
-    intra: { status: { state: 'loading' }, data: null },
-    myepitech: { status: { state: 'loading' }, data: null },
-    teams: { status: { state: 'loading' }, data: null }
+  const seed = <K extends ServiceId>(id: K): ServiceSnapshot<K> => {
+    const c = opts.initial?.[id]
+    if (!c || c.data == null) return { status: { state: 'loading' }, data: null }
+    return { status: c.updatedAt ? { state: 'loading', updatedAt: c.updatedAt } : { state: 'loading' }, data: c.data as ServiceSnapshot<K>['data'] }
   }
+  const state: Snapshots = { github: seed('github'), intra: seed('intra'), myepitech: seed('myepitech'), teams: seed('teams') }
 
   async function refreshOne(id: ServiceId): Promise<void> {
     const prev = state[id]
@@ -26,10 +28,15 @@ export function createRegistry(services: Services, opts: RegistryOptions) {
       const data = await (services[id] as Service<ServiceId>).refresh()
       next = { status: { state: 'ok', updatedAt: opts.now() }, data }
     } catch (e) {
-      // `data` garde la dernière valeur connue ; le message d'erreur ne contient jamais de secret.
-      next = e instanceof NeedsLoginError
-        ? { status: { state: 'needs-login', message: e.message }, data: prev.data }
-        : { status: { state: 'error', message: e instanceof Error ? e.message : String(e) }, data: prev.data }
+      // `data` garde la dernière valeur connue (avec sa date) ; le message ne contient jamais de secret.
+      const updatedAt = prev.status.updatedAt
+      const status: ServiceSnapshot['status'] = e instanceof NotReadyError
+        ? { state: 'loading', message: e.message }
+        : e instanceof NeedsLoginError
+          ? { state: 'needs-login', message: e.message }
+          : { state: 'error', message: e instanceof Error ? e.message : String(e) }
+      if (updatedAt !== undefined) status.updatedAt = updatedAt
+      next = { status, data: prev.data }
     }
     ;(state as Record<ServiceId, ServiceSnapshot>)[id] = next
     opts.onChange(id, next)

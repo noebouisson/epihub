@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { createTeamsService, isLoginUrl, parseUnread } from '../../src/main/services/teams'
-import { NeedsLoginError } from '../../src/main/services/types'
+import { NeedsLoginError, NotReadyError } from '../../src/main/services/types'
 
 describe('teams', () => {
   test('parseUnread nombre', () => expect(parseUnread('(3) Chat | Microsoft Teams')).toBe(3))
@@ -23,7 +23,20 @@ describe('teams', () => {
     t.onNavigate('https://login.microsoftonline.com/x')
     await expect(t.refresh()).rejects.toBeInstanceOf(NeedsLoginError)
   })
-  test('refresh sans page vue → erreur', async () => {
+  test('refresh sans page vue → NotReadyError (état loading)', async () => {
+    const p = createTeamsService().refresh()
+    await expect(p).rejects.toBeInstanceOf(NotReadyError)
     await expect(createTeamsService().refresh()).rejects.toThrow('Teams pas encore ouvert')
+  })
+  test('signale seulement les changements de non-lus ou de connexion', () => {
+    const t = createTeamsService()
+    expect(t.onNavigate('https://teams.cloud.microsoft/')).toBe(true)
+    expect(t.onTitle('Chat | Microsoft Teams')).toBe(false) // toujours 0 non-lu
+    expect(t.onTitle('(2) Chat | Microsoft Teams')).toBe(true)
+    expect(t.onTitle('(2) Activité | Microsoft Teams')).toBe(false)
+    expect(t.onNavigate('https://teams.cloud.microsoft/v2/chat')).toBe(false)
+    expect(t.onNavigate('https://login.microsoftonline.com/x')).toBe(true)
+    expect(t.onNavigate('https://login.microsoftonline.com/y')).toBe(false)
+    expect(t.onNavigate('https://teams.cloud.microsoft/')).toBe(true)
   })
 })

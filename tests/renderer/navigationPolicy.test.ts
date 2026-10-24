@@ -1,6 +1,6 @@
 import { pathToFileURL } from 'node:url';
 import { describe, expect, test } from 'vitest';
-import { classifyPreload, isPaletteShortcut, popupDecision } from '../../src/main/navigationPolicy';
+import { classifyPreload, guestNavigation, isAuthPopupUrl, isPaletteShortcut, popupPolicy } from '../../src/main/navigationPolicy';
 
 describe('classifyPreload', () => {
   test.each(['/opt/epi hub/out/preload/teams-webview.js', '/opt/a#b/out/teams-webview.js', '/opt/100%/out/teams-webview.js', '/opt/a?b/teams-webview.js'])('accepte chemin et URL pour %s', (p) => {
@@ -16,10 +16,16 @@ describe('classifyPreload', () => {
     expect(classifyPreload(['file://%zz'], '/x/t.js')).toBe('reject');
   });
 });
-test('popups', () => {
-  expect(popupDecision('https://login.microsoftonline.com/x')).toBe('allow');
-  expect(popupDecision('https://evil.com/')).toBe('deny');
-  expect(popupDecision('http://github.com/')).toBe('deny');
+describe('popups', () => {
+  test.each(['https://login.microsoftonline.com/x', 'https://login.live.com/', 'https://login.microsoft.com/a', 'https://github.com/login/oauth/authorize?x', 'https://github.com/session', 'https://github.com/login'])('fenêtre de connexion %s', (u) => expect(popupPolicy(u)).toBe('popup'));
+  test.each(['https://github.com/me/repo', 'https://github.com/loginx', 'https://teams.cloud.microsoft/', 'https://intra.epitech.eu/module/'])('même webview %s', (u) => expect(popupPolicy(u)).toBe('same-view'));
+  test.each(['https://evil.com/', 'http://github.com/login', 'http://login.microsoftonline.com/', 'nope'])('navigateur externe %s', (u) => expect(popupPolicy(u)).toBe('external'));
+  test('isAuthPopupUrl refuse un faux sous-domaine', () => expect(isAuthPopupUrl('https://login.microsoftonline.com.evil/')).toBe(false));
+});
+describe('navigation des invités', () => {
+  test('cadre principal hors liste → externe', () => expect(guestNavigation('https://evil.com/', true)).toBe('external'));
+  test('cadre principal autorisé', () => expect(guestNavigation('https://teams.cloud.microsoft/', true)).toBe('allow'));
+  test('sous-cadre : toujours laissé passer', () => expect(guestNavigation('https://evil.com/', false)).toBe('allow'));
 });
 test('raccourci palette', () => {
   expect(isPaletteShortcut({ type: 'keyDown', control: true, key: 'k' })).toBe(true);
