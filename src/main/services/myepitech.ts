@@ -65,6 +65,7 @@ export function createMyEpitechService(
           id,
           project: e.project.name,
           module: e.project.module.code,
+          slug: e.project.slug,
           date: e.date,
           percent: percentOf(e.results?.skills),
           url: `https://my.epitech.eu/index.html#d/${year}/${e.project.module.code}/${e.project.slug}/${id}`

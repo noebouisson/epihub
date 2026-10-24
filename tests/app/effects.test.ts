@@ -3,7 +3,7 @@ import { clip, createEffects, TEAMS_DEDUP_TTL, teamsKey } from '../../src/main/a
 import type { Commit, ServiceId, Settings } from '../../src/shared/types'
 
 const NOW = Date.parse('2026-01-10T12:00:00Z')
-const settings: Settings = { repoLinks: {}, notify: { github: true, intra: true, myepitech: true, teams: true }, theme: 'dark' }
+const settings: Settings = { repoLinks: {}, projectRepoLinks: {}, projectTeamsLinks: {}, notify: { github: true, intra: true, myepitech: true, teams: true }, theme: 'dark' }
 const repo = { fullName: 'me/B-CPE-200-LIL-2-1-mypoc-me', name: 'B-CPE-200-LIL-2-1-mypoc-me', url: 'u', pushedAt: '', defaultBranch: 'main' }
 const deadline = { id: 'd1', moduleCode: 'B-CPE-200', projectCode: 'B-CPE-200-LIL-2-1-mypoc', title: 'mypoc', end: new Date(NOW + 3 * 3600e3).toISOString(), url: 'http://i/d1' }
 const intra = { login: '', promo: 0, credits: 0, gpa: '', deadlines: [deadline], events: [], notifications: [{ id: 'n1', title: 'Hello', date: new Date(NOW - 3600e3).toISOString() }] }

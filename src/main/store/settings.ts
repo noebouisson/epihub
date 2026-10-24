@@ -4,6 +4,8 @@ import type { Settings } from '../../shared/types';
 
 const defaults = (): Settings => ({
   repoLinks: {},
+  projectRepoLinks: {},
+  projectTeamsLinks: {},
   notify: { github: true, intra: true, myepitech: true, teams: true },
   theme: 'dark'
 });

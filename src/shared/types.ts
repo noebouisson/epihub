@@ -13,7 +13,7 @@ export interface IntraEvent { id: string; title: string; start: string; end: str
 export interface IntraNotification { id: string; title: string; date: string }
 export interface IntraData { login: string; promo: number; credits: number; gpa: string; deadlines: Deadline[]; events: IntraEvent[]; notifications: IntraNotification[] }
 
-export interface TestResult { id: string; project: string; module: string; date: string; percent: number; url: string }
+export interface TestResult { id: string; project: string; module: string; slug: string; date: string; percent: number; url: string }
 export interface MyEpitechData { results: TestResult[] }
 export interface TeamsData { unread: number }
 
@@ -23,9 +23,25 @@ export interface ServiceSnapshot<K extends ServiceId = ServiceId> { status: Serv
 export type AlertLevel = 'warning' | 'urgent';
 export interface DeadlineView extends Deadline { repo: Repo | null; lastCommit: Commit | null; alert: AlertLevel | null; manual: boolean }
 
-export interface SearchItem { id: string; kind: 'repo' | 'pr' | 'issue' | 'deadline' | 'page'; title: string; subtitle?: string; service: ServiceId | 'app'; url: string; date?: string }
+export interface SearchItem { id: string; kind: 'repo' | 'pr' | 'issue' | 'deadline' | 'page' | 'project'; title: string; subtitle?: string; service: ServiceId | 'app'; url: string; date?: string }
 
-export interface Settings { repoLinks: Record<string /* deadline id */, string /* repo fullName */>; notify: Record<ServiceId, boolean>; theme: 'dark' | 'light' }
+export interface Settings { repoLinks: Record<string /* deadline id */, string /* repo fullName */>; projectRepoLinks: Record<string /* projectKey */, string /* repo fullName */>; projectTeamsLinks: Record<string /* projectKey */, string /* URL Teams */>; notify: Record<ServiceId, boolean>; theme: 'dark' | 'light' }
+
+export interface ProjectSummary {
+  key: string; title: string; moduleCode: string
+  deadline: DeadlineView | null; lastResult: TestResult | null
+  repo: Repo | null; teamsUrl: string | null; status: 'en-cours' | 'termine'
+}
+export type SectionState = 'loading' | 'ok' | 'needs-login' | 'error' | 'unavailable'
+export interface Section<T> { state: SectionState; data: T | null; message?: string }
+export interface SubjectData { description: string; files: { title: string; url: string }[] }
+export interface PullSummary { number: number; title: string; url: string; author: string; updatedAt: string }
+export interface RepoActivity { commits: Commit[]; pulls: PullSummary[] }
+export interface TestRun { id: string; date: string; percent: number }
+export interface TestCase { name: string; passed: boolean; crashed: boolean }
+export interface SkillReport { name: string; passed: number; count: number; tests: TestCase[] }
+export interface ResultsData { runs: TestRun[]; latest: SkillReport[] }
+export interface ProjectDetail { summary: ProjectSummary; subject: Section<SubjectData>; repo: Section<RepoActivity>; results: Section<ResultsData> }
 
 export type SetTokenResult = { ok: true } | { ok: false; error: 'ENCRYPTION_UNAVAILABLE' }
 export interface OpenTarget { service: ServiceId | 'app'; url?: string }

@@ -24,6 +24,7 @@ describe('my epitech', () => {
       id: '1002',
       project: 'Day 01',
       module: 'G-CPE-100',
+      slug: 'cpoolday01',
       percent: 75,
       url: 'https://my.epitech.eu/index.html#d/2026/G-CPE-100/cpoolday01/1002'
     })

@@ -11,7 +11,7 @@ beforeEach(() => {
 
 test('get renvoie les valeurs par défaut quand le fichier est absent', () => {
   const s = createSettingsStore(join(tmp, 'settings.json'));
-  expect(s.get()).toEqual({ repoLinks: {}, notify: { github: true, intra: true, myepitech: true, teams: true }, theme: 'dark' });
+  expect(s.get()).toEqual({ repoLinks: {}, projectRepoLinks: {}, projectTeamsLinks: {}, notify: { github: true, intra: true, myepitech: true, teams: true }, theme: 'dark' });
 });
 test('update fusionne et persiste', () => {
   const p = join(tmp, 'settings.json');
@@ -21,4 +21,12 @@ test('update fusionne et persiste', () => {
 test('un fichier corrompu redonne les valeurs par défaut', () => {
   const p = join(tmp, 'settings.json'); writeFileSync(p, '{oops');
   expect(createSettingsStore(p).get().theme).toBe('dark');
+});
+test('nouveaux réglages par défaut', () => {
+  const p = join(tmp, 'settings.json');
+  expect(createSettingsStore(p).get()).toMatchObject({ projectRepoLinks: {}, projectTeamsLinks: {} });
+});
+test('un ancien fichier sans les nouveaux champs les reçoit', () => {
+  const p = join(tmp, 'settings.json'); writeFileSync(p, JSON.stringify({ repoLinks: { a: 'me/r' } }));
+  expect(createSettingsStore(p).get().projectTeamsLinks).toEqual({});
 });
