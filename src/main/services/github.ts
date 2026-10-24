@@ -1,4 +1,4 @@
-import type { Commit, GhItem, GhNotification, GithubData, Repo } from '../../shared/types'
+import type { Commit, GhItem, GhNotification, GithubData, PullSummary, Repo } from '../../shared/types'
 import { type FetchLike, NeedsLoginError, type Service } from './types'
 
 const API = 'https://api.github.com'
@@ -15,7 +15,11 @@ const repoFromApiUrl = (u: string): string => u.replace(/^https:\/\/api\.github\
 export function createGithubService(
   fetch: FetchLike,
   getToken: () => string | null
-): Service<'github'> & { lastCommit(fullName: string, branch: string): Promise<Commit | null> } {
+): Service<'github'> & {
+  lastCommit(fullName: string, branch: string): Promise<Commit | null>
+  recentCommits(fullName: string, branch: string): Promise<Commit[]>
+  openPulls(fullName: string): Promise<PullSummary[]>
+} {
   const cache = new Map<string, { etag: string; body: string }>()
 
   /** Renvoie le JSON décodé, ou null si le statut fait partie de `nullOn`. */
@@ -49,6 +53,17 @@ export function createGithubService(
     updatedAt: i.updated_at,
     kind
   })
+
+  const toCommit = (c: any): Commit => ({
+    sha: c.sha,
+    message: String(c.commit.message).split('\n')[0],
+    author: c.commit.author?.name ?? '',
+    date: c.commit.author?.date ?? '',
+    url: c.html_url
+  })
+
+  const commitsOf = async (fullName: string, branch: string, perPage: number): Promise<Commit[]> =>
+    ((await get(`/repos/${fullName}/commits?sha=${encodeURIComponent(branch)}&per_page=${perPage}`, [409])) ?? []).map(toCommit)
 
   return {
     id: 'github',
@@ -86,16 +101,18 @@ export function createGithubService(
       }
     },
     async lastCommit(fullName, branch): Promise<Commit | null> {
-      const list = await get(`/repos/${fullName}/commits?sha=${encodeURIComponent(branch)}&per_page=1`, [409])
-      const c = list?.[0]
-      if (!c) return null
-      return {
-        sha: c.sha,
-        message: String(c.commit.message).split('\n')[0],
-        author: c.commit.author?.name ?? '',
-        date: c.commit.author?.date ?? '',
-        url: c.html_url
-      }
+      return (await commitsOf(fullName, branch, 1))[0] ?? null
+    },
+    recentCommits: (fullName, branch) => commitsOf(fullName, branch, 5),
+    async openPulls(fullName): Promise<PullSummary[]> {
+      const list: any[] = await get(`/repos/${fullName}/pulls?state=open&per_page=10`)
+      return list.map((p) => ({
+        number: p.number,
+        title: p.title,
+        url: p.html_url,
+        author: p.user?.login ?? '',
+        updatedAt: p.updated_at
+      }))
     }
   }
 }

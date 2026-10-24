@@ -1,4 +1,4 @@
-import type { MyEpitechData, TestResult } from '../../shared/types'
+import type { MyEpitechData, SkillReport, TestResult, TestRun } from '../../shared/types'
 import { type FetchLike, NeedsLoginError, type Service } from './types'
 
 /** Page chargée (fenêtre cachée) pour que le SPA écrive son token, et clé localStorage du token. */
@@ -48,17 +48,36 @@ export function createMyEpitechService(
   fetch: FetchLike,
   getToken: () => Promise<string | null>,
   now: () => Date = () => new Date()
-): Service<'myepitech'> {
+): Service<'myepitech'> & {
+  history(module: string, slug: string): Promise<TestRun[]>
+  runDetails(testRunId: string): Promise<SkillReport[]>
+} {
+  const BAD_FORMAT = 'Format My Epitech inattendu'
+
+  /** GET authentifié sur l'API Epitest ; renvoie le texte de la réponse. */
+  async function apiGet(url: string): Promise<string> {
+    const token = await getToken()
+    if (!token) throw new NeedsLoginError()
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+    if (res.status === 401 || res.status === 403) throw new NeedsLoginError()
+    if (!res.ok) throw new Error(`My Epitech HTTP ${res.status}`)
+    return res.text()
+  }
+
+  async function apiJson(url: string): Promise<any> {
+    try {
+      return JSON.parse(await apiGet(url))
+    } catch (e) {
+      if (e instanceof SyntaxError) throw new Error(BAD_FORMAT)
+      throw e
+    }
+  }
+
   return {
     id: 'myepitech',
     async refresh(): Promise<MyEpitechData> {
-      const token = await getToken()
-      if (!token) throw new NeedsLoginError()
       const year = scholarYear(now())
-      const res = await fetch(`https://api.epitest.eu/me/${year}`, { headers: { Authorization: `Bearer ${token}` } })
-      if (res.status === 401 || res.status === 403) throw new NeedsLoginError()
-      if (!res.ok) throw new Error(`My Epitech HTTP ${res.status}`)
-      const entries = JSON.parse(await res.text()) as any[]
+      const entries = JSON.parse(await apiGet(`https://api.epitest.eu/me/${year}`)) as any[]
       const results: TestResult[] = entries.map((e) => {
         const id = String(e.results?.testRunId ?? e.id)
         return {
@@ -73,6 +92,27 @@ export function createMyEpitechService(
       })
       results.sort((a, b) => Date.parse(b.date) - Date.parse(a.date))
       return { results }
+    },
+    async history(module, slug): Promise<TestRun[]> {
+      const year = scholarYear(now())
+      const entries = await apiJson(`https://api.epitest.eu/me/${year}/${encodeURIComponent(module)}/${encodeURIComponent(slug)}`)
+      if (!Array.isArray(entries)) throw new Error(BAD_FORMAT)
+      const runs = entries.map((e): TestRun => {
+        if (typeof e?.date !== 'string' || !e.results || typeof e.results !== 'object') throw new Error(BAD_FORMAT)
+        return { id: String(e.results.testRunId ?? e.id), date: e.date, percent: percentOf(e.results.skills) }
+      })
+      return runs.sort((a, b) => Date.parse(a.date) - Date.parse(b.date))
+    },
+    async runDetails(testRunId): Promise<SkillReport[]> {
+      const json = await apiJson(`https://api.epitest.eu/me/details/${encodeURIComponent(testRunId)}`)
+      const skills = json?.results?.skills ?? json?.skills
+      if (!Array.isArray(skills)) throw new Error(BAD_FORMAT)
+      return skills.map((s): SkillReport => {
+        const r = s?.FullSkillReport
+        if (typeof r?.name !== 'string' || !Array.isArray(r.tests)) throw new Error(BAD_FORMAT)
+        const tests = r.tests.map((t: any) => ({ name: String(t.name), passed: t.passed === true, crashed: t.crashed === true }))
+        return { name: r.name, passed: tests.filter((t: { passed: boolean }) => t.passed).length, count: tests.length, tests }
+      })
     }
   }
 }

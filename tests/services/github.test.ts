@@ -29,6 +29,8 @@ const fakeFetch: FetchLike = async (url, init) => {
   else if (url.includes('review-requested')) body = fx('review-requests')
   else if (url.includes('assignee')) body = fx('assigned')
   else if (url.includes('/user/repos')) body = fx('repos')
+  else if (url.includes('/pulls')) body = fx('pulls')
+  else if (url.includes('per_page=5')) body = fx('commits-5')
   else if (url.includes('/commits')) body = fx('commits')
   else return res(404, '{}')
   return res(200, body, 'W/"etag-1"')
@@ -88,5 +90,20 @@ describe('github service', () => {
   })
   test('lastCommit sur repo vide (409) → null', async () => {
     expect(await svc.lastCommit('me/empty', 'main')).toBeNull()
+  })
+  test('recentCommits : 5 commits', async () => {
+    const c = await svc.recentCommits('me/r', 'main')
+    expect(c).toHaveLength(5)
+    expect(c[0]).toMatchObject({ sha: 'c5', message: 'feat: five', author: 'Octocat' })
+    expect(calls.at(-1)?.url).toBe('https://api.github.com/repos/me/r/commits?sha=main&per_page=5')
+  })
+  test('recentCommits : repo vide (409) → []', async () => {
+    expect(await svc.recentCommits('me/empty', 'main')).toEqual([])
+  })
+  test('openPulls', async () => {
+    expect((await svc.openPulls('me/r'))[0]).toMatchObject({
+      number: 3, title: 'Add day 01', url: 'https://github.com/me/r/pull/3', author: 'octocat', updatedAt: '2026-10-24T11:00:00Z'
+    })
+    expect(calls.at(-1)?.url).toBe('https://api.github.com/repos/me/r/pulls?state=open&per_page=10')
   })
 })

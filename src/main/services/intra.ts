@@ -1,4 +1,4 @@
-import type { Deadline, IntraData, IntraEvent, IntraNotification } from '../../shared/types'
+import type { Deadline, IntraData, IntraEvent, IntraNotification, SubjectData } from '../../shared/types'
 import { normalize } from '../links/repoMatcher'
 import { type FetchLike, NeedsLoginError, type Service } from './types'
 
@@ -46,9 +46,20 @@ async function getJson(fetch: FetchLike, path: string): Promise<any> {
   return json
 }
 
-export function createIntraService(fetch: FetchLike): Service<'intra'> {
+export function createIntraService(fetch: FetchLike): Service<'intra'> & { projectDetails(url: string): Promise<SubjectData> } {
   return {
     id: 'intra',
+    async projectDetails(url): Promise<SubjectData> {
+      if (!url.startsWith(BASE + '/')) throw new Error('URL intranet invalide')
+      const path = url.slice(BASE.length).replace(/[?#].*$/, '').replace(/\/?$/, '/')
+      const [project, files] = await Promise.all([getJson(fetch, `${path}?format=json`), getJson(fetch, `${path}file/?format=json`)])
+      return {
+        description: stripTags(project?.description ?? ''),
+        files: (Array.isArray(files) ? files : [])
+          .filter((f: any) => typeof f?.fullpath === 'string' && f.fullpath.startsWith('/'))
+          .map((f: any) => ({ title: String(f.title ?? f.fullpath), url: BASE + f.fullpath }))
+      }
+    },
     async refresh(): Promise<IntraData> {
       const [user, board] = await Promise.all([getJson(fetch, '/user/?format=json'), getJson(fetch, '/?format=json')])
 

@@ -72,3 +72,49 @@ describe('token My Epitech', () => {
     expect(usableToken(JSON.stringify(jwt({ exp: 1 })), NOW)).toBeNull()
   })
 })
+
+describe('my epitech à la demande', () => {
+  const history = readFileSync('tests/fixtures/myepitech/history.json', 'utf8')
+  const details = readFileSync('tests/fixtures/myepitech/details.json', 'utf8')
+  test('history : trié, pourcentages', async () => {
+    const calls: { url: string; headers?: Record<string, string> }[] = []
+    const myepi = createMyEpitechService(mk(history, 200, calls), async () => 'tok', now)
+    const runs = await myepi.history('G-CPE-100', 'cpoolday01')
+    expect(runs.map((r) => r.percent)).toEqual([25, 50, 75])
+    expect(runs.map((r) => r.id)).toEqual(['3001', '3002', '3003'])
+    expect(calls[0].url).toBe('https://api.epitest.eu/me/2026/G-CPE-100/cpoolday01')
+    expect(calls[0].headers?.Authorization).toBe('Bearer tok')
+  })
+  test('history : composants encodés', async () => {
+    const calls: { url: string }[] = []
+    await createMyEpitechService(mk(history, 200, calls), async () => 't', now).history('G CPE', 'a/b')
+    expect(calls[0].url).toBe('https://api.epitest.eu/me/2026/G%20CPE/a%2Fb')
+  })
+  test('runDetails : compte réussis / total et crash', async () => {
+    const calls: { url: string }[] = []
+    const d = await createMyEpitechService(mk(details, 200, calls), async () => 't', now).runDetails('42')
+    expect(d[0]).toMatchObject({ name: 'basics', passed: 1, count: 2 })
+    expect(d[1].tests.some((t) => t.crashed)).toBe(true)
+    expect(calls[0].url).toBe('https://api.epitest.eu/me/details/42')
+  })
+  test('history : format inattendu → erreur claire', async () => {
+    await expect(createMyEpitechService(mk('{"a":1}'), async () => 't', now).history('G-CPE-100', 'x')).rejects.toThrow('Format My Epitech inattendu')
+  })
+  test('history : champ manquant → erreur claire', async () => {
+    await expect(createMyEpitechService(mk('[{"id":"x"}]'), async () => 't', now).history('M', 'x')).rejects.toThrow('Format My Epitech inattendu')
+  })
+  test('runDetails : format inattendu → erreur claire', async () => {
+    await expect(createMyEpitechService(mk('{"results":{}}'), async () => 't', now).runDetails('42')).rejects.toThrow('Format My Epitech inattendu')
+  })
+  test('runDetails : 401 → NeedsLoginError', async () => {
+    await expect(createMyEpitechService(mk('{}', 401), async () => 't', now).runDetails('42')).rejects.toBeInstanceOf(NeedsLoginError)
+  })
+  test('history / runDetails sans token → NeedsLoginError', async () => {
+    const svc = createMyEpitechService(mk(history), async () => null, now)
+    await expect(svc.history('M', 'x')).rejects.toBeInstanceOf(NeedsLoginError)
+    await expect(svc.runDetails('1')).rejects.toBeInstanceOf(NeedsLoginError)
+  })
+  test('les résultats exposent le slug', async () => {
+    expect((await createMyEpitechService(mk(me), async () => 't', now).refresh()).results[0].slug).toBe('cpoolday01')
+  })
+})

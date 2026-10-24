@@ -9,7 +9,14 @@ let serveLoginHtml: boolean
 let boardOverride: string | null
 let status: number
 const fakeFetch: FetchLike = async (url) => {
-  const body = serveLoginHtml ? fx('login.html') : url.includes('/user/') ? fx('user.json') : (boardOverride ?? fx('board.json'))
+  const body = serveLoginHtml
+    ? fx('login.html')
+    : url.includes('/file/')
+      ? fx('project-files.json')
+      : url.includes('/project/')
+        ? fx('project.json')
+        : url.includes('/user/') ? fx('user.json')
+          : (boardOverride ?? fx('board.json'))
   return { status, ok: status < 400, headers: { get: () => null }, text: async () => body }
 }
 
@@ -61,5 +68,30 @@ describe('intra service', () => {
   test('aucun projet → pas d’erreur', async () => {
     boardOverride = JSON.stringify({ board: { projets: [], activites: [] }, history: [] })
     expect((await intra.refresh()).deadlines).toEqual([])
+  })
+})
+
+const PROJECT_URL = 'https://intra.epitech.eu/module/2026/G-CPE-100/LYN-0-1/acti-123/project/'
+describe('intra projectDetails', () => {
+  test('projectDetails : description sans balises et fichiers absolus', async () => {
+    const s = await intra.projectDetails(PROJECT_URL)
+    expect(s.description).not.toContain('<')
+    expect(s.files[0].url).toBe('https://intra.epitech.eu/module/2026/G-CPE-100/LYN-0-1/acti-123/project/file/sujet.pdf')
+    expect(s.files.every((f) => f.url.startsWith('https://intra.epitech.eu/'))).toBe(true) // fullpath relatif ignoré
+    expect(s.files).toHaveLength(1)
+  })
+  test('projectDetails : URL hors intranet refusée', async () => {
+    await expect(intra.projectDetails('https://evil.com/x')).rejects.toThrow('URL intranet invalide')
+  })
+  test('projectDetails : page de connexion → NeedsLoginError', async () => {
+    serveLoginHtml = true
+    await expect(intra.projectDetails(PROJECT_URL)).rejects.toBeInstanceOf(NeedsLoginError)
+  })
+  test('projectDetails : fichiers non tableau → []', async () => {
+    const f: FetchLike = async (url) => ({
+      status: 200, ok: true, headers: { get: () => null },
+      text: async () => (url.includes('/file/') ? '{"a":1}' : fx('project.json'))
+    })
+    expect((await createIntraService(f).projectDetails(PROJECT_URL)).files).toEqual([])
   })
 })
