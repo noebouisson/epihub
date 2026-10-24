@@ -1,0 +1,30 @@
+{
+  "name": "epihub",
+  "version": "0.1.0",
+  "description": "EpiHub - hub personnel GitHub, intra Epitech, My Epitech et Teams",
+  "main": "./out/main/index.js",
+  "private": true,
+  "author": "EpiHub",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "dist": "electron-vite build && electron-builder --linux AppImage deb"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^4.7.0",
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8",
+    "electron-vite": "^2.3.0",
+    "fuse.js": "^7.5.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "typescript": "^5.9.3",
+    "vite": "^5.4.21",
+    "vitest": "^2.1.9",
+    "@types/node": "^22.20.5"
+  }
+}
