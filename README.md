@@ -30,7 +30,7 @@ npm run typecheck  # vérification TypeScript
 npm run dist       # construit l'AppImage et le .deb dans dist/
 ```
 
-Remplace le champ `homepage` de `package.json` (valeur factice requise par la cible .deb) par l'URL réelle du dépôt si tu le publies.
+Code source : https://github.com/noebouisson/epihub
 
 ## Première utilisation
 
