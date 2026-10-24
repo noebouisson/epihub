@@ -12,7 +12,19 @@ export interface HubOptions {
 }
 
 export function createNotificationHub(opts: HubOptions) {
+  const loadFresh = (now: number): Record<string, number> => {
+    const seen: Record<string, number> = {}
+    for (const [k, at] of Object.entries(opts.load())) if (now - at <= SEVEN_DAYS) seen[k] = at
+    return seen
+  }
   return {
+    /** Marque des clés comme vues sans rien afficher (une seule sauvegarde). */
+    prime(keys: string[]): void {
+      const now = opts.now()
+      const seen = loadFresh(now)
+      for (const k of keys) if (!(k in seen)) seen[k] = now
+      opts.save(seen)
+    },
     /** Renvoie true si la notification a été affichée. */
     push(key: string, service: ServiceId, title: string, body: string, url?: string): boolean {
       const now = opts.now()

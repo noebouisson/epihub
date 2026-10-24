@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { app, BrowserWindow, clipboard, Notification, safeStorage, session } from 'electron';
 import type { ServiceId } from '../shared/types';
@@ -44,24 +44,40 @@ function createWindow(): void {
 /** Session.fetch d'Electron renvoie une Response standard : elle satisfait FetchLike (cookies de la partition inclus). */
 const partitionFetch = (id: ServiceId): FetchLike => (url, init) => session.fromPartition(`persist:${id}`).fetch(url, init);
 
-/** Lit le token OIDC de My Epitech dans le localStorage de la partition, via une fenêtre cachée. */
+/**
+ * Lit le token OIDC de My Epitech dans le localStorage de la partition, via une fenêtre cachée.
+ * null = pas de token (connexion requise) ; exception = My Epitech injoignable.
+ */
 async function readMyEpitechToken(): Promise<string | null> {
   const win = new BrowserWindow({
     show: false,
     webPreferences: { partition: 'persist:myepitech', contextIsolation: true, nodeIntegration: false, sandbox: true }
   });
-  try {
-    await Promise.race([
-      win.loadURL('https://my.epitech.eu/'),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Délai dépassé (My Epitech)')), 20_000))
-    ]);
-    const raw = (await win.webContents.executeJavaScript("localStorage.getItem('argos-api.oidc-token')")) as string | null;
-    if (!raw) return null;
-    const token = raw.replace(/^"+|"+$/g, '');
-    return token || null;
-  } catch {
+  let timer: NodeJS.Timeout | undefined;
+  const run = async (): Promise<string | null> => {
+    try {
+      await win.loadURL('https://my.epitech.eu/');
+    } catch {
+      throw new Error('My Epitech injoignable');
+    }
+    // Le SPA écrit le token après le chargement : on interroge le localStorage jusqu'à 5 s.
+    for (let i = 0; i < 10; i++) {
+      const raw = (await win.webContents.executeJavaScript("localStorage.getItem('argos-api.oidc-token')")) as string | null;
+      const token = raw?.replace(/^"+|"+$/g, '');
+      if (token) return token;
+      await new Promise((r) => setTimeout(r, 500));
+    }
     return null;
+  };
+  try {
+    return await Promise.race([
+      run(),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('My Epitech injoignable')), 20_000);
+      })
+    ]);
   } finally {
+    clearTimeout(timer);
     if (!win.isDestroyed()) win.close();
   }
 }
@@ -72,6 +88,7 @@ function start(): void {
   const settings = createSettingsStore(join(dir, 'settings.json'));
   const secrets = createSecrets(join(dir, 'secrets.json'), safeStorage);
   const seenPath = join(dir, 'notified.json');
+  const firstRun = !existsSync(seenPath);
 
   const hub = createNotificationHub({
     now: Date.now,
@@ -103,7 +120,7 @@ function start(): void {
     teams
   };
 
-  const effects = createEffects({ lastCommit: (f, b) => github.lastCommit(f, b), settings: () => settings.get(), hub, now: Date.now });
+  const effects = createEffects({ lastCommit: (f, b) => github.lastCommit(f, b), settings: () => settings.get(), hub, now: Date.now, firstRun });
 
   const registry = createRegistry(services, {
     now: Date.now,
@@ -111,12 +128,12 @@ function start(): void {
       mainWindow?.webContents.send('epihub:changed', registry.snapshot());
       if (snap.status.state === 'ok') {
         const s = registry.snapshot();
-        void effects.afterRefresh({ github: s.github.data, intra: s.intra.data, myepitech: s.myepitech.data, teams: s.teams.data }).catch(() => {});
+        void effects.afterRefresh({ github: s.github.data, intra: s.intra.data, myepitech: s.myepitech.data, teams: s.teams.data }).catch((err: unknown) => console.error('[epihub] afterRefresh:', err instanceof Error ? err.message : String(err)));
       }
     }
   });
 
-  registerIpc({ registry, effects, settings, secrets, hub, teams, writeClipboard: (t) => clipboard.writeText(t) });
+  registerIpc({ refreshTeams: () => void registry.refresh('teams').catch((err: unknown) => console.error('[epihub] teams refresh:', err instanceof Error ? err.message : String(err))), registry, effects, settings, secrets, hub, teams, writeClipboard: (t) => clipboard.writeText(t) });
   registry.start(REFRESH_INTERVAL);
 }
 

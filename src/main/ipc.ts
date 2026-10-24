@@ -15,6 +15,7 @@ export interface IpcDeps {
   hub: { push(key: string, service: ServiceId, title: string, body: string, url?: string): boolean }
   teams: { onTitle(t: string): void; onNavigate(u: string): void }
   writeClipboard(text: string): void
+  refreshTeams(): void
 }
 
 const dataOf = (deps: IpcDeps): Record<ServiceId, any> => {
@@ -48,10 +49,16 @@ export function registerIpc(deps: IpcDeps): void {
   })
 
   ipcMain.handle('epihub:teams:title', (_e, title: unknown) => {
-    if (typeof title === 'string') deps.teams.onTitle(title)
+    if (typeof title === 'string') {
+      deps.teams.onTitle(title)
+      deps.refreshTeams()
+    }
   })
   ipcMain.handle('epihub:teams:navigate', (_e, url: unknown) => {
-    if (typeof url === 'string') deps.teams.onNavigate(url)
+    if (typeof url === 'string') {
+      deps.teams.onNavigate(url)
+      deps.refreshTeams()
+    }
   })
   // Charge utile issue de la page Teams (non fiable) : types vérifiés et longueurs plafonnées.
   ipcMain.handle('epihub:teams:notification', (_e, n: Partial<TeamsNotificationPayload>) => {

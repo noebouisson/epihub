@@ -3,14 +3,20 @@ import { alertKey, buildDeadlineViews } from '../links/deadlineAlerts'
 
 const COMMIT_TTL = 5 * 60_000
 const MAX_TEXT = 200
+const SEVEN_DAYS = 7 * 864e5
 
 type Data = Partial<{ [K in ServiceId]: ServiceDataMap[K] | null }>
 
 export interface EffectsDeps {
   lastCommit(fullName: string, branch: string): Promise<Commit | null>
   settings(): Settings
-  hub: { push(key: string, service: ServiceId, title: string, body: string, url?: string): boolean }
+  hub: {
+    push(key: string, service: ServiceId, title: string, body: string, url?: string): boolean
+    prime(keys: string[]): void
+  }
   now(): number
+  /** true si notified.json n'existait pas au démarrage : on amorce sans notifier. */
+  firstRun: boolean
 }
 
 export const clip = (s: unknown, max = MAX_TEXT): string => String(s ?? '').slice(0, max)
@@ -21,6 +27,7 @@ export function teamsKey(title: string, body: string, tag: string): string {
 }
 
 export function createEffects(deps: EffectsDeps) {
+  const primed = new Set<ServiceId>()
   const commits = new Map<string, { at: number; commit: Commit | null }>()
 
   async function commitFor(repo: Repo): Promise<Commit | null> {
@@ -62,8 +69,18 @@ export function createEffects(deps: EffectsDeps) {
         const urgent = v.alert === 'urgent'
         deps.hub.push(key, 'intra', urgent ? 'Rendu urgent' : 'Rendu bientôt dû', `${v.title} — fin ${new Date(v.end).toLocaleString('fr-FR')}`, v.url)
       }
-      for (const n of data.github?.notifications ?? []) deps.hub.push(`github:${n.id}`, 'github', n.title, n.repo, n.url)
-      for (const n of data.intra?.notifications ?? []) deps.hub.push(`intra:${n.id}`, 'intra', n.title, '')
+      const recent = (date: string): boolean => {
+        const t = Date.parse(date)
+        return Number.isNaN(t) || deps.now() - t <= SEVEN_DAYS
+      }
+      const batch = (service: 'github' | 'intra', items: { key: string; date: string; title: string; body: string; url?: string }[]): void => {
+        const fresh = items.filter((i) => recent(i.date))
+        if (deps.firstRun && !primed.has(service)) deps.hub.prime(fresh.map((i) => i.key))
+        else for (const i of fresh) deps.hub.push(i.key, service, i.title, i.body, i.url)
+        primed.add(service)
+      }
+      if (data.github) batch('github', data.github.notifications.map((n) => ({ key: `github:${n.id}`, date: n.updatedAt, title: n.title, body: n.repo, url: n.url })))
+      if (data.intra) batch('intra', data.intra.notifications.map((n) => ({ key: `intra:${n.id}`, date: n.date, title: n.title, body: '' })))
     }
   }
 }

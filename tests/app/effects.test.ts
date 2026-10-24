@@ -6,14 +6,14 @@ const NOW = Date.parse('2026-01-10T12:00:00Z')
 const settings: Settings = { repoLinks: {}, notify: { github: true, intra: true, myepitech: true, teams: true }, theme: 'dark' }
 const repo = { fullName: 'me/B-CPE-200-LIL-2-1-mypoc-me', name: 'B-CPE-200-LIL-2-1-mypoc-me', url: 'u', pushedAt: '', defaultBranch: 'main' }
 const deadline = { id: 'd1', moduleCode: 'B-CPE-200', projectCode: 'B-CPE-200-LIL-2-1-mypoc', title: 'mypoc', end: new Date(NOW + 3 * 3600e3).toISOString(), url: 'http://i/d1' }
-const intra = { login: '', promo: 0, credits: 0, gpa: '', deadlines: [deadline], events: [], notifications: [{ id: 'n1', title: 'Hello', date: '' }] }
-const github = { login: '', notifications: [{ id: 'g1', title: 'PR', repo: 'me/x', type: 'PullRequest', url: 'http://g/1', updatedAt: '' }], reviewRequests: [], assignedIssues: [], repos: [repo] }
+const intra = { login: '', promo: 0, credits: 0, gpa: '', deadlines: [deadline], events: [], notifications: [{ id: 'n1', title: 'Hello', date: new Date(NOW - 3600e3).toISOString() }] }
+const github = { login: '', notifications: [{ id: 'g1', title: 'PR', repo: 'me/x', type: 'PullRequest', url: 'http://g/1', updatedAt: new Date(NOW - 3600e3).toISOString() }], reviewRequests: [], assignedIssues: [], repos: [repo] }
 
 type LastCommit = (f: string, b: string) => Promise<Commit | null>
-function setup(lastCommit = vi.fn<LastCommit>(async () => null)) {
-  const hub = { push: vi.fn((_k: string, _s: ServiceId, _t: string, _b: string, _u?: string) => true) }
+function setup(lastCommit = vi.fn<LastCommit>(async () => null), firstRun = false) {
+  const hub = { prime: vi.fn((_k: string[]) => {}), push: vi.fn((_k: string, _s: ServiceId, _t: string, _b: string, _u?: string) => true) }
   let now = NOW
-  const fx = createEffects({ lastCommit, settings: () => settings, hub, now: () => now })
+  const fx = createEffects({ lastCommit, settings: () => settings, hub, now: () => now, firstRun })
   return { fx, hub, lastCommit, advance: (ms: number) => { now += ms } }
 }
 
@@ -53,5 +53,25 @@ describe('effets après rafraîchissement', () => {
     expect(teamsKey('t', 'b', '')).toBe('teams:t|b')
     expect(clip('x'.repeat(500))).toHaveLength(200)
     expect(clip(undefined)).toBe('')
+  })
+
+  test('premier lancement : amorce sans notifier, puis notifie les nouveautés', async () => {
+    const { fx, hub } = setup(undefined, true)
+    await fx.afterRefresh({ github, intra })
+    expect(hub.prime).toHaveBeenCalledWith(['github:g1'])
+    expect(hub.prime).toHaveBeenCalledWith(['intra:n1'])
+    expect(hub.push.mock.calls.map((c) => c[0])).toEqual(['intra:deadline:d1:urgent'])
+    await fx.afterRefresh({ github: { ...github, notifications: [...github.notifications, { ...github.notifications[0]!, id: 'g2' }] }, intra })
+    expect(hub.push.mock.calls.map((c) => c[0])).toContain('github:g2')
+  })
+
+  test('notifications de plus de 7 jours ignorées', async () => {
+    const { fx, hub } = setup()
+    const old = new Date(NOW - 8 * 864e5).toISOString()
+    await fx.afterRefresh({
+      github: { ...github, notifications: [{ ...github.notifications[0]!, updatedAt: old }] },
+      intra: { ...intra, deadlines: [], notifications: [{ id: 'n9', title: 'x', date: old }] }
+    })
+    expect(hub.push).not.toHaveBeenCalled()
   })
 })

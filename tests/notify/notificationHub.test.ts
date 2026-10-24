@@ -24,3 +24,5 @@ test('clé conservée avant 7 jours', () => { hub.push('k', 'intra', 't', 'b'); 
 test('persiste les clés vues', () => { hub.push('k', 'intra', 't', 'b'); expect(saved.k).toBe(t) })
 test('purge les clés périmées à chaque push', () => { hub.push('old', 'intra', 't', 'b'); t += 8 * 864e5; hub.push('new', 'intra', 't', 'b'); expect(saved).toEqual({ new: t }) })
 test('cible : service et url', () => { hub.push('k', 'github', 't', 'b', 'https://u'); expect(shown[0].target).toEqual({ service: 'github', url: 'https://u' }) })
+
+test('prime marque sans afficher', () => { hub.prime(['a', 'b']); expect(shown).toHaveLength(0); expect(Object.keys(saved)).toEqual(['a', 'b']); expect(hub.push('a', 'github', 't', 'b')).toBe(false) })
