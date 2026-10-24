@@ -53,6 +53,15 @@ describe('intra service', () => {
     expect(d.notifications[0].title).not.toContain('<')
     expect(d.notifications[0].title).toContain('Jean')
   })
+  test('entités : invalides laissées telles quelles, hexadécimales décodées, refresh intact', async () => {
+    const titles = ['a &#1114112; b', 'a &constructor; &__proto__; b', 'l&#x27;&#xE9;']
+    boardOverride = JSON.stringify({
+      board: { projets: [], activites: [] },
+      history: titles.map((title, i) => ({ id: i, title, date: '2026-10-24 08:00:00' }))
+    })
+    const n = (await intra.refresh()).notifications.map((x) => x.title)
+    expect(n).toEqual(['a &#1114112; b', 'a &constructor; &__proto__; b', "l'é"])
+  })
   test('page HTML de connexion → NeedsLoginError', async () => {
     serveLoginHtml = true
     await expect(intra.refresh()).rejects.toBeInstanceOf(NeedsLoginError)

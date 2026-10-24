@@ -23,13 +23,15 @@ export function parseTitleLink(link: string): { moduleCode: string; projectCode:
   return { moduleCode: m[1], projectCode: '' }
 }
 
-const ENTITIES: Record<string, string> = { nbsp: ' ', amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'" }
+const ENTITIES = new Map([['nbsp', ' '], ['amp', '&'], ['lt', '<'], ['gt', '>'], ['quot', '"']])
 
-/** Décode les entités HTML courantes (nommées et numériques) en une seule passe. */
+/** Décode les entités HTML courantes (nommées, décimales, hexadécimales) ; le reste est laissé tel quel. */
 const decodeEntities = (s: string): string =>
-  s.replace(/&(#\d+|[a-z]+);/gi, (m, e: string) =>
-    e[0] === '#' ? (ENTITIES[e] ?? String.fromCodePoint(+e.slice(1))) : (ENTITIES[e.toLowerCase()] ?? m)
-  )
+  s.replace(/&(?:#(\d+)|#x([0-9a-f]+)|([a-z]+));/gi, (m, dec?: string, hex?: string, name?: string) => {
+    if (name) return ENTITIES.get(name.toLowerCase()) ?? m
+    const code = dec ? parseInt(dec, 10) : parseInt(hex as string, 16)
+    return code <= 0x10ffff ? String.fromCodePoint(code) : m
+  })
 
 const stripTags = (s: string): string => decodeEntities(s.replace(/<[^>]*>/g, '')).replace(/\s+/g, ' ').trim()
 
