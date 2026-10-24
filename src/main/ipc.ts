@@ -1,5 +1,5 @@
 import { ipcMain, type IpcMainInvokeEvent } from 'electron'
-import type { ServiceId, Settings, TeamsNotificationPayload } from '../shared/types'
+import type { ProjectDetail, ProjectSummary, ServiceId, Settings, TeamsNotificationPayload } from '../shared/types'
 import { clip, TEAMS_DEDUP_TTL, teamsKey } from './app/effects'
 import { buildSearchItems, search } from './links/searchIndex'
 import { shareText } from './links/shareText'
@@ -11,6 +11,7 @@ const isServiceId = (v: unknown): v is ServiceId => SERVICE_IDS.includes(v as Se
 export interface IpcDeps {
   registry: { refresh(id?: ServiceId): Promise<void>; snapshot(): Record<ServiceId, { data: unknown }> }
   effects: { deadlines(data: Record<string, unknown>): Promise<unknown> }
+  projects: { list(): Promise<ProjectSummary[]>; detail(key: unknown, force: unknown): Promise<ProjectDetail | null> }
   settings: { get(): Settings; update(patch: Partial<Settings>): Settings }
   secrets: { setGithubToken(t: string): void; clearGithubToken(): void }
   hub: { push(key: string, service: ServiceId, title: string, body: string, url?: string, ttlMs?: number): boolean }
@@ -40,7 +41,11 @@ export function registerIpc(deps: IpcDeps): void {
   handle('epihub:snapshot', () => deps.registry.snapshot())
   handle('epihub:refresh', (_e, id?: unknown) => deps.registry.refresh(isServiceId(id) ? id : undefined))
   handle('epihub:deadlines', () => deps.effects.deadlines(dataOf(deps)))
-  handle('epihub:search', (_e, query: unknown) => search(buildSearchItems(dataOf(deps)), typeof query === 'string' ? query : ''))
+  handle('epihub:projects', () => deps.projects.list())
+  handle('epihub:project', (_e, key: unknown, force: unknown) => deps.projects.detail(key, force))
+  handle('epihub:search', async (_e, query: unknown) =>
+    search(buildSearchItems(dataOf(deps), await deps.projects.list().catch(() => [])), typeof query === 'string' ? query : '')
+  )
   handle('epihub:teamsPreloadPath', () => deps.teamsPreloadPath)
   handle('epihub:settings:get', () => deps.settings.get())
   handle('epihub:settings:update', (_e, patch: Partial<Settings>) => deps.settings.update(patch ?? {}))

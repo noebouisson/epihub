@@ -1,5 +1,5 @@
 import Fuse from 'fuse.js'
-import type { GhItem, SearchItem, ServiceDataMap, ServiceId } from '../../shared/types'
+import type { GhItem, ProjectSummary, SearchItem, ServiceDataMap, ServiceId } from '../../shared/types'
 
 type Snapshot = Partial<{ [K in ServiceId]: ServiceDataMap[K] | null }>
 
@@ -17,7 +17,7 @@ const PAGES: SearchItem[] = [
 
 const squash = (s: string): string => s.toLowerCase().replace(/[-_\s]+/g, '')
 
-export function buildSearchItems(snap: Snapshot): SearchItem[] {
+export function buildSearchItems(snap: Snapshot, projects: ProjectSummary[] = []): SearchItem[] {
   const out: SearchItem[] = [...PAGES]
   const seen = new Set(out.map((i) => i.id))
   const add = (item: SearchItem): void => {
@@ -35,6 +35,7 @@ export function buildSearchItems(snap: Snapshot): SearchItem[] {
   }
   for (const d of snap.intra?.deadlines ?? [])
     add({ id: `deadline:${d.id}`, kind: 'deadline', title: d.title, subtitle: `${d.moduleCode} · ${d.projectCode}`, service: 'intra', url: d.url, date: d.end })
+  for (const p of projects) add({ id: `project:${p.key}`, kind: 'project', title: p.title, subtitle: p.moduleCode, service: 'app', url: '' })
   return out
 }
 
@@ -45,7 +46,7 @@ export function search(items: SearchItem[], query: string, limit = 20): SearchIt
   const compact = squash(q)
   if (!compact) return items.filter((i) => i.kind === 'page').slice(0, limit)
 
-  const indexed: Indexed[] = items.map((item) => ({ item, codes: squash(item.subtitle ?? '') }))
+  const indexed: Indexed[] = items.map((item) => ({ item, codes: squash(item.kind === 'project' ? `${item.subtitle ?? ''} ${item.id.slice('project:'.length)}` : (item.subtitle ?? '')) }))
   const fuse = new Fuse(indexed, {
     includeScore: true,
     threshold: 0.4,

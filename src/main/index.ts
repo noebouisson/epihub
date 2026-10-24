@@ -5,6 +5,8 @@ import { app, BrowserWindow, clipboard, Notification, safeStorage, session } fro
 import type { ServiceId } from '../shared/types';
 import { debounce } from './app/debounce';
 import { createEffects } from './app/effects';
+import { createProjectDetails } from './app/projectDetails';
+import { createProjectsApi } from './app/projectsApi';
 import { revealWindow } from './app/window';
 import { registerIpc } from './ipc';
 import { readMyEpitechToken } from './myepitechToken';
@@ -101,6 +103,14 @@ function start(): void {
 
   const effects = createEffects({ lastCommit: (f, b) => github.lastCommit(f, b), settings: () => settings.get(), hub, now: Date.now });
 
+  const projects = createProjectsApi({
+    snapshot: () => registry.snapshot(),
+    deadlines: (data) => effects.deadlines(data),
+    settings: () => settings.get(),
+    details: createProjectDetails({ intra: services.intra, github, myepitech: services.myepitech, now: Date.now }),
+    now: Date.now
+  });
+
   // Un cycle de rafraîchissement (4 services) ne déclenche qu'un seul passage des effets.
   const runEffects = debounce(() => {
     const s = registry.snapshot();
@@ -131,6 +141,7 @@ function start(): void {
     mainWebContentsId: () => mainWindow?.webContents.id,
     registry,
     effects,
+    projects,
     settings,
     secrets,
     hub,

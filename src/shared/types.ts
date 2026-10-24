@@ -52,6 +52,8 @@ export interface EpihubApi {
   snapshot(): Promise<{ [K in ServiceId]: ServiceSnapshot<K> }>
   refresh(id?: ServiceId): Promise<void>
   deadlines(): Promise<DeadlineView[]>
+  projects(): Promise<ProjectSummary[]>
+  project(key: string, force?: boolean): Promise<ProjectDetail | null>
   search(query: string): Promise<SearchItem[]>
   getSettings(): Promise<Settings>
   updateSettings(patch: Partial<Settings>): Promise<Settings>

@@ -27,6 +27,15 @@ describe('buildSearchItems', () => {
   test('snapshot null toléré', () => expect(buildSearchItems({ github: null, intra: null }).length).toBe(6))
 })
 
+describe('projets', () => {
+  const summary = { key: 'G-CPE-100/cpoolday01', title: 'Day 01', moduleCode: 'G-CPE-100', deadline: null, lastResult: null, repo: null, teamsUrl: null, status: 'en-cours' } as const
+  test('recherche : élément projet', () => {
+    const items = buildSearchItems({}, [summary])
+    expect(search(items, 'cpoolday')[0].id).toBe('project:G-CPE-100/cpoolday01')
+    expect(items.find((i) => i.kind === 'project')).toMatchObject({ title: 'Day 01', subtitle: 'G-CPE-100', service: 'app', url: '' })
+  })
+})
+
 describe('search', () => {
   test('trouve un rendu par code module', () => {
     const items = buildSearchItems({ intra: { ...intraEmpty, deadlines: [{ id: 'acti-1', moduleCode: 'G-CPE-100', projectCode: 'cpoolday01', title: 'Day 01', end: '2026-10-25T00:00:00Z', url: 'https://intra.epitech.eu/x' }] } })
