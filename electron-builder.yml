@@ -13,3 +13,5 @@ linux:
   maintainer: noebouisson <187784166+noebouisson@users.noreply.github.com>
 deb:
   packageName: epihub
+  afterInstall: build/linux/after-install.sh
+  afterRemove: build/linux/after-remove.sh

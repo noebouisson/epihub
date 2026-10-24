@@ -13,12 +13,23 @@ Les paquets sont générés dans `dist/` (voir `npm run dist`).
   ```
   L'AppImage nécessite FUSE 2 : `sudo apt install libfuse2` (`libfuse2t64` sur Ubuntu 24.04+). Sans FUSE, lancer avec `APPIMAGE_EXTRACT_AND_RUN=1 ./EpiHub-0.1.0.AppImage`.
 
-  Sur Ubuntu 24.04 et plus récent, les espaces de noms utilisateur non privilégiés sont restreints par AppArmor : le bac à sable de Chromium ne peut alors pas démarrer depuis une AppImage et l'application se ferme avec une erreur `chrome-sandbox` / « The SUID sandbox helper binary was found, but is not configured correctly ». Dans ce cas, lancer `./EpiHub-0.1.0.AppImage --no-sandbox` (ce qui désactive le bac à sable des processus de rendu de Chromium), ou préférer le paquet `.deb`, qui installe `chrome-sandbox` avec les bons droits.
-- **.deb** :
+  Sur Ubuntu 24.04 et plus récent, les espaces de noms utilisateur non privilégiés sont restreints par AppArmor : le bac à sable de Chromium ne peut alors pas démarrer depuis une AppImage et l'application se ferme avec une erreur `chrome-sandbox` / « The SUID sandbox helper binary was found, but is not configured correctly ». Dans ce cas, lancer `./EpiHub-0.1.0.AppImage --no-sandbox` (ce qui désactive le bac à sable des processus de rendu de Chromium), ou préférer le paquet `.deb` (recommandé).
+- **.deb** (recommandé sur Ubuntu) :
   ```bash
   sudo apt install ./dist/epihub_*.deb
   ```
-  Puis lancer « EpiHub » depuis le menu des applications.
+  Le paquet installe l'application dans `/opt/EpiHub`, l'ajoute au menu des applications et pose un profil AppArmor (`/etc/apparmor.d/epihub`) pour que le bac à sable Chromium fonctionne sur Ubuntu 23.10+. Le profil est retiré à la désinstallation (`sudo apt remove epihub`).
+
+### Icône sur le bureau
+
+Après l'installation du `.deb` :
+
+```bash
+./scripts/desktop-shortcut.sh           # ajoute EpiHub sur le bureau
+./scripts/desktop-shortcut.sh --remove  # la retire
+```
+
+Le script copie le raccourci du menu sur le bureau et le marque « de confiance » pour GNOME, ce qui permet de lancer EpiHub d'un double-clic. Pour l'épingler au dock : ouvre EpiHub, clic droit sur son icône dans le dock → « Épingler au dock ».
 
 ## Développement
 
