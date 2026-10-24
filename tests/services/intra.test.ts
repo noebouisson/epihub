@@ -36,7 +36,7 @@ describe('intra service', () => {
     expect(d.deadlines[0]).toMatchObject({
       id: 'acti-123',
       moduleCode: 'G-CPE-100',
-      projectCode: 'cpoolday01',
+      projectCode: 'c-pool-day-01',
       url: 'https://intra.epitech.eu/module/2026/G-CPE-100/LYN-0-1/acti-123/project/'
     })
     expect(d.deadlines[1]).toMatchObject({ id: 'acti-456', moduleCode: '' })

@@ -15,12 +15,12 @@ export function parseIntraDate(s: string): string {
 
 /**
  * Code module extrait du lien (`/module/<année>/<CODE>/...`). Le code projet vient du titre
- * (`normalize` du titre sans espaces) ; il est vide si aucun titre n'est fourni.
+ * (calculé par le service) : il reste vide ici.
  */
-export function parseTitleLink(link: string, title = ''): { moduleCode: string; projectCode: string } {
+export function parseTitleLink(link: string): { moduleCode: string; projectCode: string } {
   const m = /^\/module\/\d+\/([^/]+)\//.exec(link)
   if (!m) return { moduleCode: '', projectCode: '' }
-  return { moduleCode: m[1], projectCode: title ? normalize(title.replace(/\s+/g, '')) : '' }
+  return { moduleCode: m[1], projectCode: '' }
 }
 
 const stripTags = (s: string): string => s.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim()
@@ -59,7 +59,7 @@ export function createIntraService(fetch: FetchLike): Service<'intra'> {
         deadlines.push({
           id: `acti-${p.id_activite}`,
           moduleCode: parseTitleLink(p.title_link).moduleCode,
-          projectCode: normalize(String(p.title).replace(/\s+/g, '')),
+          projectCode: normalize(String(p.title)),
           title: p.title,
           end,
           url: BASE + p.title_link
