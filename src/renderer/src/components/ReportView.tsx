@@ -24,7 +24,8 @@ export function ReportView({ report: r }: { report: Report }): JSX.Element {
         </p>
         <p>{r.summary}</p>
         <p className="dim small">
-          {fmtDate(r.date)} · commit <code>{r.commit.slice(0, 8)}</code>
+          {fmtDate(r.date)}
+          {r.commit && <> · commit <code>{r.commit.slice(0, 8)}</code></>}
           {r.members.length > 0 && <> · {r.members.join(', ')}</>}
         </p>
       </section>

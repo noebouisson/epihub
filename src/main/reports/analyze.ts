@@ -6,20 +6,24 @@ const NO_TEST_PASSED = 'Aucun test ne passe : le binaire ne compile pas, ne s’
 interface Blocker { text: string; advice: ReportAdvice }
 const p1 = (title: string, text: string): ReportAdvice => ({ priority: 1, title, text, tests: [] })
 
+/** Indicateurs de la moulinette sans traduction connue : un seul conseil P2 qui les liste. */
+function unknownFlagsAdvice(summary: RunSummary): ReportAdvice | null {
+  const flags = summary.failureFlags.filter((f) => f !== 'no-test-passed')
+  if (flags.length === 0) return null
+  return { priority: 2, title: 'Indicateurs moulinette', text: `Indicateurs signalés : ${flags.join(', ')}. Consulte le détail du passage sur My Epitech pour savoir ce qu’ils recouvrent.`, tests: [] }
+}
+
 function blockersOf(summary: RunSummary, detail: RunDetail): Blocker[] {
   const out: Blocker[] = []
   if (detail.deliveryError) out.push({ text: `Erreur de livraison : ${detail.deliveryError}`, advice: p1('Erreur de livraison', 'Vérifie que les fichiers attendus sont à la racine du dépôt, que le binaire porte exactement le nom du sujet et que rien d’interdit n’est poussé (binaires, .o).') })
   if (detail.makeError) out.push({ text: `Erreur de compilation : ${detail.makeError}`, advice: p1('Erreur de compilation', 'Lance `make re` sur une copie propre du dépôt (git clone) : le Makefile doit compiler sans erreur avec les flags du sujet.') })
   if (detail.bannedFunctions.length > 0) out.push({ text: `Fonctions interdites : ${detail.bannedFunctions.join(', ')}`, advice: p1('Fonctions interdites', 'Remplace les fonctions listées par tes propres implémentations ou par les fonctions autorisées du sujet.') })
-  for (const f of summary.failureFlags) {
-    if (f === 'no-test-passed') out.push({ text: NO_TEST_PASSED, advice: p1('Aucun test ne passe', 'Vérifie que le projet compile, que le binaire a le bon nom et qu’il produit une sortie sur un cas simple.') })
-    else out.push({ text: `Indicateur moulinette : ${f}`, advice: p1('Indicateur moulinette', 'Consulte le détail du passage sur My Epitech pour cet indicateur.') })
-  }
+  if (summary.failureFlags.includes('no-test-passed')) out.push({ text: NO_TEST_PASSED, advice: p1('Aucun test ne passe', 'Vérifie que le projet compile, que le binaire a le bon nom et qu’il produit une sortie sur un cas simple.') })
   return out
 }
 
 function adviceFor(
-  blockerAdvice: ReportAdvice[], failed: Report['failedTests'], categories: Report['categories'],
+  blockerAdvice: ReportAdvice[], flagAdvice: ReportAdvice | null, failed: Report['failedTests'], categories: Report['categories'],
   style: Report['style'], coverage: Report['coverage']
 ): ReportAdvice[] {
   const advice: ReportAdvice[] = []
@@ -39,6 +43,7 @@ function adviceFor(
   if (baseIncomplete && higher) {
     advice.push({ priority: 2, title: 'Tests de base d’abord', text: 'Des tests de base échouent alors que des tests plus difficiles sont à faire : termine d’abord les catégories base/easy.', tests: [] })
   }
+  if (flagAdvice) advice.push(flagAdvice)
   if (categories.some((c) => lower(c).includes('format') && incomplete(c))) {
     advice.push({ priority: 2, title: 'Format de sortie', text: 'Compare ta sortie caractère par caractère : espaces, retours à la ligne, sortie d’erreur et code de retour.', tests: [] })
   }
@@ -53,21 +58,27 @@ function adviceFor(
 
 function evolutionOf(summary: RunSummary, detail: RunDetail, previous: { summary: RunSummary; detail: RunDetail | null }): Report['evolution'] {
   if (previous.detail) {
+    // Catégorie et nom gardés séparés (un « / » dans l'un ou l'autre ne crée ni collision ni libellé tronqué).
     const state = (d: RunDetail) => {
-      const m = new Map<string, boolean>()
-      for (const c of d.categories) for (const t of c.tests) if (!t.skipped) m.set(`${c.name}/${t.name}`, t.passed)
+      const m = new Map<string, Map<string, boolean>>()
+      for (const c of d.categories) {
+        const tests = m.get(c.name) ?? new Map<string, boolean>()
+        for (const t of c.tests) if (!t.skipped) tests.set(t.name, t.passed)
+        m.set(c.name, tests)
+      }
       return m
     }
     const before = state(previous.detail)
     const now = state(detail)
     const fixed: string[] = []
     const broken: string[] = []
-    for (const [name, passed] of now) {
-      const was = before.get(name)
-      if (was === undefined) continue
-      const label = name.slice(name.indexOf('/') + 1)
-      if (!was && passed) fixed.push(label)
-      if (was && !passed) broken.push(label)
+    for (const [category, tests] of now) {
+      for (const [name, passed] of tests) {
+        const was = before.get(category)?.get(name)
+        if (was === undefined) continue
+        if (!was && passed) fixed.push(name)
+        if (was && !passed) broken.push(name)
+      }
     }
     return { fixed, broken, byCategory: false }
   }
@@ -99,11 +110,13 @@ export function buildReport(summary: RunSummary, detail: RunDetail, previous?: {
   const failedTests = [...failed.filter(urgent), ...failed.filter((t) => !urgent(t))]
 
   const coverage = { lines: detail.coverage.lines ?? summary.coverage.lines, branches: detail.coverage.branches ?? summary.coverage.branches }
-  const advice = adviceFor(blockerList.map((b) => b.advice), failedTests, categories, summary.style, coverage)
+  const advice = adviceFor(blockerList.map((b) => b.advice), unknownFlagsAdvice(summary), failedTests, categories, summary.style, coverage)
 
   const total = categories.reduce((n, c) => n + c.count, 0)
   const passed = categories.reduce((n, c) => n + c.passed, 0)
   let text = `${passed} tests sur ${total} passent.`
+  const skipped = detail.categories.reduce((n, c) => n + c.tests.filter((t) => t.skipped).length, 0)
+  if (skipped > 0) text += skipped > 1 ? ` ${skipped} tests non exécutés.` : ' 1 test non exécuté.'
   const firstP1 = advice.find((a) => a.priority === 1)
   if (allPassed(summary.categories)) text += ' Tous les tests passent.'
   else if (firstP1) text += ` Priorité : ${firstP1.title}.`

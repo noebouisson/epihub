@@ -1,6 +1,7 @@
 import type { Report } from '../../shared/types'
 
 const VERDICT = { reussi: 'Réussi', partiel: 'Partiel', echoue: 'Échoué' } as const
+const PRIORITY = { 1: 'Priorité haute', 2: 'Priorité moyenne', 3: 'Priorité basse' } as const
 
 /** Texte issu des données : une seule ligne, caractères Markdown échappés. */
 const esc = (s: string) => s.replace(/\s*[\r\n]+\s*/g, ' ').replace(/[\\`*_[\]<>#]/g, (c) => `\\${c}`)
@@ -62,11 +63,16 @@ export function renderMarkdown(r: Report): string {
 
   if (r.advice.length > 0) {
     out.push('## Comment s’améliorer', '')
-    for (const a of r.advice) {
-      out.push(`${a.priority}. **${esc(a.title)}** (priorité ${a.priority}) : ${esc(a.text)}`)
-      if (a.tests.length > 0) out.push(`   Tests : ${a.tests.map(esc).join(', ')}`)
+    for (const p of [1, 2, 3] as const) {
+      const items = r.advice.filter((a) => a.priority === p)
+      if (items.length === 0) continue
+      out.push(`### ${PRIORITY[p]}`, '')
+      for (const a of items) {
+        out.push(`- **${esc(a.title)}** : ${esc(a.text)}`)
+        if (a.tests.length > 0) out.push(`  - Tests : ${a.tests.map(esc).join(', ')}`)
+      }
+      out.push('')
     }
-    out.push('')
   }
 
   if (r.evolution) {

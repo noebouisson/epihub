@@ -24,3 +24,10 @@ test('style, couverture et compteurs par catégorie', () => {
   expect(h).toContain('2 crash')
   expect(h).toContain('1 obligatoire(s) en échec')
 })
+test('conseils regroupés par priorité, comme le Markdown', () => {
+  const html = renderHtml(rep({ advice: [{ priority: 1, title: 'Crashs', text: 'Lance valgrind.', tests: ['t1'] }, { priority: 3, title: 'Style', text: 'x', tests: [] }] }))
+  expect(html).toContain('<h3>Priorité haute</h3><ul><li><strong>Crashs</strong> : Lance valgrind. Tests : t1</li></ul>')
+  expect(html).toContain('<h3>Priorité basse</h3>')
+  expect(html).not.toContain('Priorité moyenne')
+  expect(html).not.toContain('(priorité')
+})

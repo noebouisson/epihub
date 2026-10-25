@@ -29,3 +29,26 @@ test('le Markdown contient les sections', () => {
   for (const h of ['## Résumé', '## Pourquoi', '## Comment s’améliorer', '## Évolution', '## Ce qui marche']) expect(md).toContain(h)
 })
 test('reportPath : codes vides après nettoyage → repli', () => expect(reportPath(rep({ unitCode: '///', projectCode: '-x-' })).dir).toBe('projet-x'))
+test('conseils : listes à puces sous « ### Priorité haute / moyenne / basse », sans liste numérotée', () => {
+  const md = renderMarkdown(rep({ advice: [
+    { priority: 1, title: 'Crashs', text: 'Lance valgrind.', tests: ['t1'] },
+    { priority: 3, title: 'Coding style', text: '1 fatal.', tests: [] },
+    { priority: 2, title: 'Format de sortie', text: 'Compare.', tests: [] }
+  ] }))
+  const hi = md.indexOf('### Priorité haute')
+  const mid = md.indexOf('### Priorité moyenne')
+  const lo = md.indexOf('### Priorité basse')
+  expect(hi).toBeGreaterThan(-1)
+  expect(mid).toBeGreaterThan(hi)
+  expect(lo).toBeGreaterThan(mid)
+  expect(md).toContain('- **Crashs** : Lance valgrind.')
+  expect(md).toContain('  - Tests : t1')
+  expect(md.indexOf('- **Format de sortie**')).toBeGreaterThan(mid)
+  expect(md).not.toMatch(/^\d+\. /m)
+  expect(md).not.toContain('(priorité')
+})
+test('pas de titre de priorité vide', () => {
+  const md = renderMarkdown(rep({ advice: [{ priority: 2, title: 'X', text: 'y', tests: [] }] }))
+  expect(md).not.toContain('### Priorité haute')
+  expect(md).not.toContain('### Priorité basse')
+})

@@ -1,6 +1,7 @@
 import type { Report } from '../../shared/types'
 
 const VERDICT = { reussi: 'Réussi', partiel: 'Partiel', echoue: 'Échoué' } as const
+const PRIORITY = { 1: 'Priorité haute', 2: 'Priorité moyenne', 3: 'Priorité basse' } as const
 const COLOR = { reussi: '#1a7f37', partiel: '#9a6700', echoue: '#cf222e' } as const
 
 const e = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#39;' })[c]!)
@@ -35,8 +36,10 @@ export function renderHtml(r: Report): string {
   if (r.coverage.lines !== null || r.coverage.branches !== null) parts.push(`<p>Couverture : lignes ${r.coverage.lines ?? '?'} %, branches ${r.coverage.branches ?? '?'} %</p>`)
   if (r.advice.length > 0) {
     parts.push('<h2>Comment s’améliorer</h2>')
-    for (const a of r.advice) {
-      parts.push(`<p><strong>${e(a.title)}</strong> (priorité ${a.priority}) : ${e(a.text)}${a.tests.length ? ` Tests : ${e(a.tests.join(', '))}` : ''}</p>`)
+    for (const p of [1, 2, 3] as const) {
+      const items = r.advice.filter((a) => a.priority === p)
+      if (items.length === 0) continue
+      parts.push(`<h3>${PRIORITY[p]}</h3><ul>${items.map((a) => `<li><strong>${e(a.title)}</strong> : ${e(a.text)}${a.tests.length ? ` Tests : ${e(a.tests.join(', '))}` : ''}</li>`).join('')}</ul>`)
     }
   }
   if (r.evolution) {

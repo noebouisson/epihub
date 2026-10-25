@@ -22,7 +22,28 @@ test('verdict échoué : < 50 %, no-test-passed, makeError, aucun test', () => {
   expect(verdictOf(sum({ categories: { a: cat(10, 9) } }), det({ deliveryError: 'x' }))).toBe('echoue')
   expect(verdictOf(sum({ categories: {} }), det())).toBe('echoue')
 })
-test('blockers dans l’ordre et flag inconnu', () => expect(buildReport(sum({ failureFlags: ['no-test-passed', 'weird'] }), det({ deliveryError: 'x', makeError: 'y', bannedFunctions: ['printf'] })).blockers.map((b) => b.split(' :')[0])).toEqual(['Erreur de livraison', 'Erreur de compilation', 'Fonctions interdites', 'Aucun test ne passe', 'Indicateur moulinette']))
+test('blockers dans l’ordre, flag inconnu hors blocages', () => expect(buildReport(sum({ failureFlags: ['no-test-passed', 'weird'] }), det({ deliveryError: 'x', makeError: 'y', bannedFunctions: ['printf'] })).blockers.map((b) => b.split(' :')[0])).toEqual(['Erreur de livraison', 'Erreur de compilation', 'Fonctions interdites', 'Aucun test ne passe']))
+test('flags inconnus : un seul conseil P2 qui les liste, jamais « Priorité : Indicateur moulinette »', () => {
+  const r = buildReport(sum({ categories: { a: cat(10, 9) }, failureFlags: ['weird', 'odd'] }), det())
+  const flags = r.advice.filter((a) => a.title.startsWith('Indicateur'))
+  expect(flags).toHaveLength(1)
+  expect(flags[0].priority).toBe(2)
+  expect(flags[0].text).toContain('weird, odd')
+  expect(r.summary).not.toContain('Indicateur')
+})
+test('tests non exécutés mentionnés dans le résumé', () => {
+  const { s, d } = failing()
+  expect(buildReport(s, d).summary).toBe('18 tests sur 29 passent. 1 test non exécuté. Priorité : Tests obligatoires.')
+  const two = det({ categories: [{ name: 'a', tests: [test_('x', { skipped: true }), test_('y', { skipped: true })] }] })
+  expect(buildReport(sum(), two).summary).toContain('2 tests non exécutés.')
+  expect(buildReport(sum(), det()).summary).not.toContain('non exécuté')
+})
+test('évolution par test : catégorie contenant « / »', () => {
+  const t = (name: string, passed: boolean) => test_(name, { passed })
+  const prev = { summary: sum(), detail: det({ categories: [{ name: 'bonus / extra', tests: [t('x', false)] }, { name: 'a/b', tests: [t('c', true)] }, { name: 'a', tests: [t('b/c', false)] }] }) }
+  const r = buildReport(sum(), det({ categories: [{ name: 'bonus / extra', tests: [t('x', true)] }, { name: 'a/b', tests: [t('c', true)] }, { name: 'a', tests: [t('b/c', false)] }] }), prev)
+  expect(r.evolution).toEqual({ fixed: ['x'], broken: [], byCategory: false })
+})
 
 const failing = () => ({
   s: sum({ categories: { a: cat(29, 18) } }),
@@ -76,7 +97,7 @@ test('tri des conseils par priorité', () => {
 })
 test('résumé', () => {
   const { s, d } = failing()
-  expect(buildReport(s, d).summary).toBe('18 tests sur 29 passent. Priorité : Tests obligatoires.')
+  expect(buildReport(s, d).summary).toBe('18 tests sur 29 passent. 1 test non exécuté. Priorité : Tests obligatoires.')
 })
 test('résumé à 100 %', () => expect(buildReport(sum(), det()).summary).toBe('10 tests sur 10 passent. Tous les tests passent.'))
 test('évolution par test', () => {

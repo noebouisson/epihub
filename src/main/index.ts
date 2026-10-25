@@ -182,7 +182,7 @@ function start(): void {
       dir: reportsRoot,
       openPath: (p) => shell.openPath(p),
       showItemInFolder: (p) => shell.showItemInFolder(p),
-      exportPdf
+      exportPdf: (report, out) => exportPdf(report, out, dir)
     },
     writeClipboard: (t) => clipboard.writeText(t)
   });
