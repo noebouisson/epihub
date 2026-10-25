@@ -1,10 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ProjectSummary } from '../../../shared/types';
+import type { OpenFn, Snapshot } from '../App';
+import { emptyProjects, scoreLine } from '../projectView';
 import { relativeTime } from '../time';
 
 interface Props {
+  snapshot: Snapshot | null;
+  open: OpenFn;
   openProject(key: string): void;
 }
+
+const LOGIN_LABEL = { intra: "Ouvrir l'intranet", myepitech: 'Ouvrir My Epitech' } as const;
 
 function Row({ p, openProject }: { p: ProjectSummary; openProject(key: string): void }): JSX.Element {
   const d = p.deadline;
@@ -14,7 +20,7 @@ function Row({ p, openProject }: { p: ProjectSummary; openProject(key: string): 
         <button type="button" className="link" onClick={() => openProject(p.key)}>{p.title}</button>
         <div className="dim small">
           <span className="tag">{p.moduleCode}</span>{' '}
-          {d ? <strong>{relativeTime(d.end, new Date())}</strong> : p.lastResult ? <>Dernier score : {Math.round(p.lastResult.percent)} %</> : null}
+          {d ? <strong>{relativeTime(d.end, new Date())}</strong> : scoreLine(p.lastResult)}
           {d?.alert && <span className={`badge badge-${d.alert === 'urgent' ? 'danger' : 'warn'}`}>{d.alert === 'urgent' ? 'Urgent' : 'Attention'}</span>}
         </div>
       </div>
@@ -22,7 +28,23 @@ function Row({ p, openProject }: { p: ProjectSummary; openProject(key: string): 
   );
 }
 
-export function Projects({ openProject }: Props): JSX.Element {
+function EmptyList({ snapshot, open }: { snapshot: Snapshot | null; open: OpenFn }): JSX.Element {
+  const empty = emptyProjects({ intra: snapshot?.intra.status.state, myepitech: snapshot?.myepitech.status.state });
+  return (
+    <div className="stack-sm">
+      <p className="dim">{empty.message}</p>
+      {empty.login.length > 0 && (
+        <div className="form-row wrap">
+          {empty.login.map((s) => (
+            <button key={s} type="button" className="btn btn-small" onClick={() => open(s)}>{LOGIN_LABEL[s as keyof typeof LOGIN_LABEL]}</button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function Projects({ snapshot, open, openProject }: Props): JSX.Element {
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null);
   const [q, setQ] = useState('');
 
@@ -54,8 +76,10 @@ export function Projects({ openProject }: Props): JSX.Element {
       </div>
       {projects === null ? (
         <p className="dim">Chargement…</p>
+      ) : projects.length === 0 ? (
+        <EmptyList snapshot={snapshot} open={open} />
       ) : filtered.length === 0 ? (
-        <p className="dim">Aucun projet.</p>
+        <p className="dim">Aucun projet</p>
       ) : (
         <div className="stack">
           {groups.map(([label, list]) => list.length > 0 && (

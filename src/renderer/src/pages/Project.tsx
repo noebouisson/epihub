@@ -6,6 +6,7 @@ import { RepoPicker } from '../components/RepoPicker';
 import { ScoreChart } from '../components/ScoreChart';
 import { TeamsLinkEditor } from '../components/TeamsLinkEditor';
 import { findProject, isTeamsUrl, linkPatch, resolveLink } from '../../../shared/projects';
+import { projectPage, scoreLine } from '../projectView';
 import { relativeTime } from '../time';
 
 interface Props {
@@ -64,17 +65,25 @@ export function Project({ projectKey: key, settings, repos, open, toast, onSetti
   }, [key, load]);
 
   const summary = detail?.summary ?? listSummary;
+  // Sans force : les sections en échec ne sont pas en cache et un changement de lien change la signature.
   const afterLinkChange = (s: Settings): void => {
     onSettings(s);
-    load(true);
+    load(false);
   };
+  const retry = (): void => load(false);
 
   const back = <button type="button" className="btn btn-small btn-ghost" onClick={onBack}>← Projets</button>;
-  if (!summary && (detail === null || failed)) {
+  const state = projectPage({ summary, detail, failed });
+  if (state === 'not-found') {
+    return <div className="page"><div className="page-head">{back}</div><p className="dim">Projet introuvable.</p></div>;
+  }
+  if (state === 'failed') {
     return (
       <div className="page">
         <div className="page-head">{back}</div>
-        <p className="dim">{failed ? 'Impossible de charger le projet.' : 'Projet introuvable.'}</p>
+        {summary && <h1>{summary.title}</h1>}
+        <p className="dim">Impossible de charger le projet</p>
+        <button type="button" className="btn" disabled={busy} onClick={retry}>Réessayer</button>
       </div>
     );
   }
@@ -83,7 +92,7 @@ export function Project({ projectKey: key, settings, repos, open, toast, onSetti
   }
 
   const d = summary.deadline;
-  const retry = (): void => load(true);
+  const score = scoreLine(summary.lastResult);
   const teamsUrl = settings ? resolveLink(settings.projectTeamsLinks, summary, isTeamsUrl) : summary.teamsUrl;
   const shareUrl = d?.url ?? summary.lastResult?.url ?? null;
   const linked = summary.repo;
@@ -103,6 +112,7 @@ export function Project({ projectKey: key, settings, repos, open, toast, onSetti
         <div className="dim small">
           <span className="tag">{summary.moduleCode}</span>{' '}
           {d && <strong>{relativeTime(d.end, new Date())}</strong>}
+          {score && <span>{d ? ' · ' : ''}{score}</span>}
           {d?.alert && <span className={`badge badge-${d.alert === 'urgent' ? 'danger' : 'warn'}`}>{d.alert === 'urgent' ? 'Urgent' : 'Attention'}</span>}
         </div>
         <div className="form-row wrap">

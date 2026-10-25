@@ -73,7 +73,7 @@ export function App(): JSX.Element {
       <main className="content">
         {view === 'home' && <Home snapshot={snapshot} settings={settings} onSettings={setSettings} open={open} openProject={openProject} setView={select} toast={showToast} />}
         {view === 'projects' && (projectKey === null ? (
-          <Projects openProject={openProject} />
+          <Projects snapshot={snapshot} open={open} openProject={openProject} />
         ) : (
           <Project key={projectKey} projectKey={projectKey} settings={settings} repos={snapshot?.github.data?.repos ?? []} open={open} toast={showToast} onSettings={setSettings} onBack={() => setProjectKey(null)} />
         ))}
