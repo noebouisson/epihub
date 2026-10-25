@@ -71,6 +71,10 @@ export interface EpihubApi {
   onChanged(cb: (snapshot: { [K in ServiceId]: ServiceSnapshot<K> }) => void): () => void
   onPalette(cb: () => void): () => void
   onOpen(cb: (target: OpenTarget) => void): () => void
+  reports(projectKey: string): Promise<ReportEntry[]>
+  report(runId: string): Promise<Report | null>
+  openReportFile(runId: string): Promise<boolean>
+  exportReportPdf(runId: string): Promise<string | null>
 }
 
 /* ---- Rapports de moulinette ---- */
@@ -102,3 +106,6 @@ export interface Report {
   evolution: { fixed: string[]; broken: string[]; byCategory: boolean } | null
   working: string[]
 }
+
+/** Entrée de l'index des rapports (`file` : chemin du .md, ou null si l'écriture a échoué). */
+export interface ReportEntry { runId: string; projectKey: string; projectId: string; file: string | null; score: number | null; verdict: Verdict; date: string; generatedAt: number }

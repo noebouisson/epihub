@@ -46,3 +46,10 @@ test('ttl court : le même message Teams 3 minutes plus tard notifie à nouveau'
   expect(hub.push('teams:k', 'teams', 't', 'b', undefined, ttl)).toBe(true)
   expect(shown).toHaveLength(2)
 })
+
+test('push : la cible du clic peut différer du service (ex. page projet)', () => {
+  const shown: Array<{ target: { service: string; url?: string } }> = []
+  const hub = createNotificationHub({ now: () => 1, enabled: () => true, load: () => ({}), save: () => {}, show: (n) => shown.push(n) })
+  hub.push('k', 'myepitech', 't', 'b', 'project:A/b', undefined, 'app')
+  expect(shown[0].target).toEqual({ service: 'app', url: 'project:A/b' })
+})

@@ -1,8 +1,12 @@
+import { mkdir } from 'node:fs/promises'
+import { dirname } from 'node:path'
 import { ipcMain, type IpcMainInvokeEvent } from 'electron'
-import type { ProjectDetail, ProjectSummary, ServiceId, Settings, TeamsNotificationPayload } from '../shared/types'
+import type { Report, ReportEntry, ProjectDetail, ProjectSummary, ServiceId, Settings, TeamsNotificationPayload } from '../shared/types'
 import { clip, TEAMS_DEDUP_TTL, teamsKey } from './app/effects'
 import { buildSearchItems, search } from './links/searchIndex'
 import { shareText } from './links/shareText'
+import { isInsideDir, pdfPathFor } from './reports/pipeline'
+import { validRunId, type ReportStore } from './reports/store'
 import { isTrustedSender } from './securityPolicy'
 import { sanitizeSettingsPatch } from './store/settings'
 
@@ -17,6 +21,14 @@ export interface IpcDeps {
   secrets: { setGithubToken(t: string): void; clearGithubToken(): void }
   hub: { push(key: string, service: ServiceId, title: string, body: string, url?: string, ttlMs?: number): boolean }
   teams: { onTitle(t: string): boolean; onNavigate(u: string): boolean }
+  reports: {
+    store: ReportStore
+    /** `<Documents>/EpiHub/rapports` */
+    dir: string
+    openPath(path: string): Promise<string>
+    showItemInFolder(path: string): void
+    exportPdf(report: Report, outFile: string): Promise<void>
+  }
   writeClipboard(text: string): void
   refreshTeams(): void
   teamsPreloadPath: string
@@ -92,5 +104,24 @@ export function registerIpc(deps: IpcDeps): void {
     const body = clip(n?.body)
     const tag = clip(n?.tag)
     deps.hub.push(teamsKey(title, body, tag), 'teams', title, body, undefined, TEAMS_DEDUP_TTL)
+  })
+
+  handle('epihub:reports', (_e, key: unknown): ReportEntry[] => (typeof key === 'string' ? deps.reports.store.list(key) : []))
+  handle('epihub:report', (_e, runId: unknown): Report | null => (validRunId(runId) ? deps.reports.store.report(runId) : null))
+  handle('epihub:openReportFile', async (_e, runId: unknown): Promise<boolean> => {
+    if (!validRunId(runId)) return false
+    const file = deps.reports.store.get(runId)?.file
+    if (!file || !isInsideDir(file, deps.reports.dir)) return false
+    return (await deps.reports.openPath(file)) === ''
+  })
+  handle('epihub:exportReportPdf', async (_e, runId: unknown): Promise<string | null> => {
+    if (!validRunId(runId)) return null
+    const report = deps.reports.store.report(runId)
+    if (!report) return null
+    const out = pdfPathFor(report, deps.reports.dir)
+    await mkdir(dirname(out), { recursive: true })
+    await deps.reports.exportPdf(report, out)
+    deps.reports.showItemInFolder(out)
+    return out
   })
 }

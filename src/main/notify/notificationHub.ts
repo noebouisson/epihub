@@ -35,15 +35,15 @@ export function createNotificationHub(opts: HubOptions) {
     },
     /**
      * Renvoie true si la notification a été affichée. `ttlMs` = fenêtre de déduplication de cette
-     * clé (7 jours par défaut ; plus court pour les messages Teams).
+     * clé (7 jours par défaut ; plus court pour les messages Teams). `targetService` : cible du clic (par défaut `service`).
      */
-    push(key: string, service: ServiceId, title: string, body: string, url?: string, ttlMs = SEVEN_DAYS): boolean {
+    push(key: string, service: ServiceId, title: string, body: string, url?: string, ttlMs = SEVEN_DAYS, targetService: ServiceId | 'app' = service): boolean {
       const now = opts.now()
       const seen = loadFresh(now)
       const fresh = !(key in seen && now - seen[key] < ttlMs) && opts.enabled(service)
       if (fresh) {
         seen[key] = now
-        opts.show({ title, body, target: { service, url } })
+        opts.show({ title, body, target: { service: targetService, url } })
       }
       opts.save(seen)
       return fresh

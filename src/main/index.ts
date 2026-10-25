@@ -1,7 +1,9 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { app, BrowserWindow, clipboard, net, Notification, safeStorage, session } from 'electron';
+import { app, BrowserWindow, clipboard, net, Notification, safeStorage, session, shell } from 'electron';
+import { projectKey } from '../shared/projects';
 import type { ServiceId } from '../shared/types';
 import { debounce } from './app/debounce';
 import { createEffects } from './app/effects';
@@ -10,6 +12,9 @@ import { createProjectDetails } from './app/projectDetails';
 import { createProjectsApi } from './app/projectsApi';
 import { revealWindow } from './app/window';
 import { registerIpc } from './ipc';
+import { createReportPipeline, rapportsDir } from './reports/pipeline';
+import { exportPdf } from './reports/pdf';
+import { createReportStore } from './reports/store';
 import { installNavigationSecurity } from './security';
 import { configureServiceSessions } from './sessions';
 import { createNotificationHub, type HubNotification } from './notify/notificationHub';
@@ -111,6 +116,18 @@ function start(): void {
     now: Date.now
   });
 
+  const reportStore = createReportStore(dir);
+  const reportsRoot = rapportsDir(app.getPath('documents'));
+  const reportPipeline = createReportPipeline({
+    runDetail: (id) => myepitech.runDetail(id),
+    store: reportStore,
+    docsDir: app.getPath('documents'),
+    writeFile: (path, data) => writeFile(path, data, 'utf8'),
+    mkdir: (path) => mkdir(path, { recursive: true }).then(() => undefined),
+    notify: (title, body, key, runId) => void hub.push(`myepitech:run:${runId}`, 'myepitech', title, body, `project:${key}`, undefined, 'app'),
+    projectKeyOf: (p) => projectKey(p.unitCode, p.name)
+  });
+
   // Un cycle de rafraîchissement (4 services) ne déclenche qu'un seul passage des effets.
   const runEffects = debounce(() => {
     const s = registry.snapshot();
@@ -122,7 +139,7 @@ function start(): void {
   const registry = createRegistry(services, {
     now: Date.now,
     initial: cache.load(),
-    onChange: (_id, snap) => {
+    onChange: (id, snap) => {
       projects.invalidate();
       mainWindow?.webContents.send('epihub:changed', registry.snapshot());
       if (snap.status.state === 'ok') {
@@ -132,6 +149,8 @@ function start(): void {
           console.error('[epihub] cache:', errMsg(err));
         }
         runEffects();
+        const mine = registry.snapshot().myepitech.data;
+        if (id === 'myepitech' && mine) void reportPipeline.process(mine).catch((err: unknown) => console.error('[epihub] rapports:', errMsg(err)));
       }
     }
   });
@@ -147,6 +166,13 @@ function start(): void {
     secrets,
     hub,
     teams,
+    reports: {
+      store: reportStore,
+      dir: reportsRoot,
+      openPath: (p) => shell.openPath(p),
+      showItemInFolder: (p) => shell.showItemInFolder(p),
+      exportPdf
+    },
     writeClipboard: (t) => clipboard.writeText(t)
   });
   registry.start(REFRESH_INTERVAL);
