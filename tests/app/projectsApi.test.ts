@@ -2,9 +2,11 @@ import { describe, expect, test, vi } from 'vitest'
 import { createProjectsApi } from '../../src/main/app/projectsApi'
 import type { DeadlineView } from '../../src/shared/types'
 
-const dl = { id: 'a', moduleCode: 'G-CPE-100', projectCode: 'x', title: 'Day 01', end: '2099-01-01T00:00:00Z', url: 'u', repo: null, lastCommit: null, alert: null, manual: false } as DeadlineView
+const dl = { id: 'mye-7', moduleCode: 'G-CPE-100', projectCode: 'day01', title: 'Day 01', end: '2099-01-01T00:00:00Z', url: 'u', repo: null, lastCommit: null, alert: null, manual: false } as DeadlineView
+const project = { id: '7', name: 'Day 01', unitCode: 'G-CPE-100', unitName: 'Pool', description: '', start: '2098-01-01T00:00:00Z', end: '2099-01-01T00:00:00Z', url: 'u' }
+const profile = { login: 'jane.doe@epitech.eu', name: 'Jane Doe', promotion: null, semester: null, gpa: null, cursus: null }
 
-function make(myepitech: any = null) {
+function make(myepitech: any = { profile, projects: [project], runs: {} }) {
   const clock = { t: 0 }
   const deadlines = vi.fn(async () => [dl])
   const get = vi.fn(async (summary: any, force?: boolean) => ({ summary, force }) as any)
@@ -59,11 +61,14 @@ describe('createProjectsApi', () => {
     await expect(api.list()).rejects.toThrow('boom')
     await expect(api.list()).resolves.toHaveLength(1)
   })
-  test('une clé intranet (alias) ouvre le projet fusionné', async () => {
-    const result = { id: 'r1', project: 'Day 01', module: 'G-CPE-100', slug: 'cpool-d01', date: '2026-10-20T00:00:00Z', percent: 50, url: 'u' }
-    const { api, get } = make({ results: [result] })
-    const d = await api.detail('G-CPE-100/day01', false)
+  test('un alias (projectCode du passage) ouvre le projet', async () => {
+    const run = { id: 'r1', unitCode: 'G-CPE-100', projectCode: 'cpool-d01', title: 'Day 01', year: 2098, date: '2098-10-20T00:00:00Z', commit: '', members: [], failureFlags: [], style: { fatal: 0, major: 0, minor: 0, info: 0, penalty: null }, coverage: { lines: null, branches: null }, categories: {}, repoLink: null }
+    const { api, get } = make({ profile, projects: [project], runs: { '7': [run] } })
+    const d = await api.detail('G-CPE-100/cpoold01', false)
     expect(get).toHaveBeenCalledTimes(1)
-    expect(d?.summary).toMatchObject({ key: 'G-CPE-100/cpoold01', deadline: { id: 'a' }, lastResult: { id: 'r1' } })
+    expect(d?.summary).toMatchObject({ key: 'G-CPE-100/day01', projectId: '7', deadline: { id: 'mye-7' }, lastResult: { id: 'r1' } })
+  })
+  test('sans données My Epitech : liste vide', async () => {
+    expect(await make(null).api.list()).toEqual([])
   })
 })

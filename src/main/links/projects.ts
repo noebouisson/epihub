@@ -1,10 +1,13 @@
 import { isTeamsUrl, projectKey, resolveLink } from '../../shared/projects'
-import type { DeadlineView, ProjectSummary, Repo, Settings, TestResult } from '../../shared/types'
+import type { DeadlineView, MyProject, ProjectSummary, Repo, RunSummary, Settings } from '../../shared/types'
 import { matchRepo, normalize } from './repoMatcher'
 
 export interface BuildProjectsInput {
+  /** Vues de rendu (`effects.deadlines`), id `mye-<projectId>`. */
   deadlines: DeadlineView[]
-  results: TestResult[]
+  projects: MyProject[]
+  /** Passages par id de projet, du plus récent au plus ancien. */
+  runs: Record<string, RunSummary[]>
   repos: Repo[]
   settings: Pick<Settings, 'repoLinks' | 'projectRepoLinks' | 'projectTeamsLinks'>
   now: Date
@@ -12,9 +15,9 @@ export interface BuildProjectsInput {
 
 const time = (iso: string): number => Date.parse(iso)
 
-interface Entry { title: string; moduleCode: string; deadline: DeadlineView | null; lastResult: TestResult | null; aliases: string[] }
+interface Entry { project: MyProject; deadline: DeadlineView | null; lastResult: RunSummary | null; aliases: string[] }
 
-function resolveRepo(p: Entry & { key: string }, repos: Repo[], settings: BuildProjectsInput['settings']): Repo | null {
+function resolveRepo(p: ProjectSummary, repos: Repo[], settings: BuildProjectsInput['settings']): Repo | null {
   const byName = (fullName: string | null | undefined): Repo | null => (fullName ? (repos.find((r) => r.fullName === fullName) ?? null) : null)
   const d = p.deadline
   const linked = byName(resolveLink(settings.projectRepoLinks, p, (v) => repos.some((r) => r.fullName === v))) ?? (d ? byName(settings.repoLinks[d.id]) : null)
@@ -23,61 +26,55 @@ function resolveRepo(p: Entry & { key: string }, repos: Repo[], settings: BuildP
   return matchRepo({ id: p.key, moduleCode: p.moduleCode, projectCode: normalize(p.title), title: p.title, end: '', url: '' }, repos, {}).repo
 }
 
-/** Clé du résultat My Epitech : celle du slug (repli sur le nom pour un ancien cache sans slug). */
-const resultKey = (r: TestResult): string => projectKey(r.module, r.slug || r.project)
-
 /**
- * Fusionne les rendus intranet et les résultats My Epitech. Un résultat rejoint un rendu du même module
- * si le titre intranet compacté vaut son slug ou son nom compacté ; chaque projet garde toutes ses clés en alias.
+ * Projets My Epitech inscrits. Clé canonique `projectKey(unitCode, nom)` ; les codes projet des passages
+ * donnent des alias (association repo, anciens liens). Deux projets de même clé : celui qui finit le plus
+ * tard l'emporte, les alias sont réunis.
  */
-export function buildProjects({ deadlines, results, repos, settings, now }: BuildProjectsInput): ProjectSummary[] {
-  const entries: Entry[] = []
-  const index = new Map<string, Entry>()
-  const addAlias = (e: Entry, k: string): void => {
-    if (!e.aliases.includes(k)) e.aliases.push(k)
-    if (!index.has(k)) index.set(k, e)
-  }
+export function buildProjects({ deadlines, projects, runs, repos, settings, now }: BuildProjectsInput): ProjectSummary[] {
+  const byDeadlineId = new Map(deadlines.map((d) => [d.id, d]))
+  const entries = new Map<string, Entry>()
 
-  for (const d of deadlines) {
-    const k = projectKey(d.moduleCode, d.title)
-    const known = index.get(k)
-    if (known) known.deadline = d
+  for (const project of projects) {
+    const key = projectKey(project.unitCode, project.name)
+    const list = runs[project.id] ?? []
+    const aliases = [key]
+    for (const r of list) {
+      const k = projectKey(r.unitCode, r.projectCode)
+      if (!aliases.includes(k)) aliases.push(k)
+    }
+    const d = byDeadlineId.get(`mye-${project.id}`)
+    const entry: Entry = { project, deadline: d && time(project.end) > now.getTime() ? d : null, lastResult: list[0] ?? null, aliases }
+    const known = entries.get(key)
+    if (!known) entries.set(key, entry)
     else {
-      const e: Entry = { title: d.title, moduleCode: d.moduleCode, deadline: d, lastResult: null, aliases: [] }
-      entries.push(e)
-      addAlias(e, k)
+      const winner = time(project.end) > time(known.project.end) ? entry : known
+      const loser = winner === entry ? known : entry
+      for (const k of loser.aliases) if (!winner.aliases.includes(k)) winner.aliases.push(k)
+      entries.set(key, winner)
     }
-  }
-  for (const r of results) {
-    const slugKey = resultKey(r)
-    const nameKey = projectKey(r.module, r.project)
-    let e = index.get(slugKey) ?? index.get(nameKey)
-    if (!e) {
-      e = { title: r.project, moduleCode: r.module, deadline: null, lastResult: null, aliases: [] }
-      entries.push(e)
-    }
-    addAlias(e, slugKey)
-    addAlias(e, nameKey)
-    if (!e.lastResult || time(r.date) > time(e.lastResult.date)) e.lastResult = r
   }
 
-  const projects: ProjectSummary[] = entries.map((e) => {
-    const key = e.lastResult ? resultKey(e.lastResult) : e.aliases[0]
-    const p = { ...e, key }
-    return {
+  const out: ProjectSummary[] = [...entries.entries()].map(([key, e]) => {
+    const summary: ProjectSummary = {
       key,
       aliases: e.aliases,
-      title: e.title,
-      moduleCode: e.moduleCode,
+      projectId: e.project.id,
+      title: e.project.name,
+      moduleCode: e.project.unitCode,
       deadline: e.deadline,
       lastResult: e.lastResult,
-      repo: resolveRepo(p, repos, settings),
-      teamsUrl: resolveLink(settings.projectTeamsLinks, p, isTeamsUrl),
-      status: e.deadline && time(e.deadline.end) > now.getTime() ? 'en-cours' : 'termine'
+      repo: null,
+      teamsUrl: null,
+      status: e.deadline ? 'en-cours' : 'termine'
     }
+    summary.repo = resolveRepo(summary, repos, settings)
+    summary.teamsUrl = resolveLink(settings.projectTeamsLinks, summary, isTeamsUrl)
+    return summary
   })
+  const endOf = new Map([...entries.entries()].map(([k, e]) => [k, time(e.project.end) || -Infinity]))
   const resultTime = (p: ProjectSummary): number => (p.lastResult ? time(p.lastResult.date) : -Infinity)
-  const active = projects.filter((p) => p.status === 'en-cours').sort((a, b) => time(a.deadline!.end) - time(b.deadline!.end))
-  const done = projects.filter((p) => p.status === 'termine').sort((a, b) => resultTime(b) - resultTime(a))
+  const active = out.filter((p) => p.status === 'en-cours').sort((a, b) => time(a.deadline!.end) - time(b.deadline!.end))
+  const done = out.filter((p) => p.status === 'termine').sort((a, b) => resultTime(b) - resultTime(a) || endOf.get(b.key)! - endOf.get(a.key)!)
   return [...active, ...done]
 }

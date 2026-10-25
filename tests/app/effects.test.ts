@@ -1,17 +1,18 @@
 import { describe, expect, test, vi } from 'vitest'
 import { clip, createEffects, TEAMS_DEDUP_TTL, teamsKey } from '../../src/main/app/effects'
 import { projectKey } from '../../src/shared/projects'
-import type { Commit, ServiceId, Settings } from '../../src/shared/types'
+import type { Commit, MyEpitechData, MyProject, ServiceId, Settings } from '../../src/shared/types'
 
 const NOW = Date.parse('2026-01-10T12:00:00Z')
 const settings: Settings = { repoLinks: {}, projectRepoLinks: {}, projectTeamsLinks: {}, notify: { github: true, intra: true, myepitech: true, teams: true }, theme: 'dark' }
 const repo = { fullName: 'me/B-CPE-200-LIL-2-1-mypoc-me', name: 'B-CPE-200-LIL-2-1-mypoc-me', url: 'u', pushedAt: '', defaultBranch: 'main' }
-const deadline = { id: 'd1', moduleCode: 'B-CPE-200', projectCode: 'B-CPE-200-LIL-2-1-mypoc', title: 'mypoc', end: new Date(NOW + 3 * 3600e3).toISOString(), url: 'http://i/d1' }
-const intra = { login: '', promo: 0, credits: 0, gpa: '', deadlines: [deadline], events: [], notifications: [{ id: 'n1', title: 'Hello', date: new Date(NOW - 3600e3).toISOString() }] }
+const project: MyProject = { id: '1', name: 'mypoc', unitCode: 'B-CPE-200', unitName: 'Unit', description: '', start: '2026-01-01T00:00:00Z', end: new Date(NOW + 3 * 3600e3).toISOString(), url: 'https://my.epitech.eu/' }
+const profile = { login: 'jane.doe@epitech.eu', name: 'Jane Doe', promotion: 2030, semester: 1, gpa: null, cursus: null }
+const myepitech: MyEpitechData = { profile, projects: [project], runs: {} }
 const github = { login: '', notifications: [{ id: 'g1', title: 'PR', repo: 'me/x', type: 'PullRequest', url: 'http://g/1', updatedAt: new Date(NOW - 3600e3).toISOString() }], reviewRequests: [], assignedIssues: [], repos: [repo] }
 
 type LastCommit = (f: string, b: string) => Promise<Commit | null>
-function setup(lastCommit = vi.fn<LastCommit>(async () => null), primed: ServiceId[] = ['github', 'intra'], conf: Settings = settings) {
+function setup(lastCommit = vi.fn<LastCommit>(async () => null), primed: ServiceId[] = ['github'], conf: Settings = settings) {
   const marks = new Set<ServiceId>(primed)
   const hub = {
     prime: vi.fn((_k: string[], s?: ServiceId) => { if (s) marks.add(s) }),
@@ -24,28 +25,39 @@ function setup(lastCommit = vi.fn<LastCommit>(async () => null), primed: Service
 }
 
 describe('effets après rafraîchissement', () => {
-  test('pousse alerte de rendu, notification GitHub et intra avec les bonnes clés', async () => {
+  test('pousse alerte de rendu (My Epitech) et notification GitHub avec les bonnes clés', async () => {
     const { fx, hub } = setup()
-    await fx.afterRefresh({ github, intra })
-    const keys = hub.push.mock.calls.map((c) => c[0])
-    expect(keys).toContain('intra:deadline:d1:urgent')
-    expect(keys).toContain('github:g1')
-    expect(keys).toContain('intra:n1')
+    await fx.afterRefresh({ github, myepitech })
+    expect(hub.push.mock.calls.map((c) => [c[0], c[1]])).toEqual([['myepitech:deadline:mye-1:urgent', 'myepitech'], ['github:g1', 'github']])
+  })
+
+  test('rendus depuis My Epitech : projets à venir seulement', async () => {
+    const past = { ...project, id: '2', name: 'Old one', end: new Date(NOW - 3600e3).toISOString() }
+    const views = await setup().fx.deadlines({ myepitech: { ...myepitech, projects: [project, past] } })
+    expect(views).toHaveLength(1)
+    expect(views[0]).toMatchObject({ id: 'mye-1', moduleCode: 'B-CPE-200', projectCode: 'mypoc', title: 'mypoc', end: project.end, url: 'https://my.epitech.eu/' })
+  })
+
+  test('les données intranet ne produisent plus rien', async () => {
+    const { fx, hub } = setup()
+    await fx.afterRefresh({ intra: null })
+    expect(hub.push).not.toHaveBeenCalled()
+    expect(hub.prime).not.toHaveBeenCalled()
   })
 
   test('cache des derniers commits pendant 5 minutes', async () => {
     const { fx, lastCommit, advance } = setup()
-    await fx.deadlines({ github, intra })
-    await fx.deadlines({ github, intra })
+    await fx.deadlines({ github, myepitech })
+    await fx.deadlines({ github, myepitech })
     expect(lastCommit).toHaveBeenCalledTimes(1)
     advance(5 * 60_000 + 1)
-    await fx.deadlines({ github, intra })
+    await fx.deadlines({ github, myepitech })
     expect(lastCommit).toHaveBeenCalledTimes(2)
   })
 
   test('une erreur lastCommit ne casse pas le calcul', async () => {
     const { fx } = setup(vi.fn<LastCommit>(async () => { throw new Error('x') }))
-    const views = await fx.deadlines({ github, intra })
+    const views = await fx.deadlines({ github, myepitech })
     expect(views).toHaveLength(1)
     expect(views[0]!.lastCommit).toBeNull()
   })
@@ -55,14 +67,15 @@ describe('effets après rafraîchissement', () => {
     const old = { ...repo, fullName: 'me/old', name: 'old' }
     const gh = { ...github, repos: [repo, other, old] }
     const key = projectKey('B-CPE-200', 'mypoc')
+    const d1 = 'mye-1'
     const run = async (links: Partial<Settings>): Promise<string | undefined> =>
-      (await setup(undefined, undefined, { ...settings, ...links }).fx.deadlines({ github: gh, intra }))[0]!.repo?.fullName
-    expect(await run({ projectRepoLinks: { [key]: 'me/other' }, repoLinks: { d1: 'me/old' } })).toBe('me/other')
-    expect(await run({ projectRepoLinks: { [key]: 'me/gone' }, repoLinks: { d1: 'me/old' } })).toBe('me/old')
+      (await setup(undefined, undefined, { ...settings, ...links }).fx.deadlines({ github: gh, myepitech }))[0]!.repo?.fullName
+    expect(await run({ projectRepoLinks: { [key]: 'me/other' }, repoLinks: { [d1]: 'me/old' } })).toBe('me/other')
+    expect(await run({ projectRepoLinks: { [key]: 'me/gone' }, repoLinks: { [d1]: 'me/old' } })).toBe('me/old')
     expect(await run({ projectRepoLinks: { [key]: 'me/gone' } })).toBe(repo.fullName)
   })
 
-  test('sans données intra, aucune vue', async () => {
+  test('sans données My Epitech, aucune vue', async () => {
     expect(await setup().fx.deadlines({})).toEqual([])
   })
 
@@ -77,11 +90,11 @@ describe('effets après rafraîchissement', () => {
 
   test('premier lancement : amorce sans notifier, puis notifie les nouveautés', async () => {
     const { fx, hub } = setup(undefined, [])
-    await fx.afterRefresh({ github, intra })
+    await fx.afterRefresh({ github, myepitech })
     expect(hub.prime).toHaveBeenCalledWith(['github:g1'], 'github')
-    expect(hub.prime).toHaveBeenCalledWith(['intra:n1'], 'intra')
-    expect(hub.push.mock.calls.map((c) => c[0])).toEqual(['intra:deadline:d1:urgent'])
-    await fx.afterRefresh({ github: { ...github, notifications: [...github.notifications, { ...github.notifications[0]!, id: 'g2' }] }, intra })
+    expect(hub.prime).toHaveBeenCalledTimes(1)
+    expect(hub.push.mock.calls.map((c) => c[0])).toEqual(['myepitech:deadline:mye-1:urgent'])
+    await fx.afterRefresh({ github: { ...github, notifications: [...github.notifications, { ...github.notifications[0]!, id: 'g2' }] }, myepitech })
     expect(hub.push.mock.calls.map((c) => c[0])).toContain('github:g2')
   })
 
@@ -90,19 +103,19 @@ describe('effets après rafraîchissement', () => {
     const old = new Date(NOW - 8 * 864e5).toISOString()
     await fx.afterRefresh({
       github: { ...github, notifications: [{ ...github.notifications[0]!, updatedAt: old }] },
-      intra: { ...intra, deadlines: [], notifications: [{ id: 'n9', title: 'x', date: old }] }
+      myepitech: { ...myepitech, projects: [] }
     })
     expect(hub.push).not.toHaveBeenCalled()
   })
 
   test('service configuré plus tard : amorcé à son premier passage, sans rafale', async () => {
-    const { fx, hub } = setup(undefined, ['intra'])
-    await fx.afterRefresh({ intra })
+    const { fx, hub } = setup(undefined, [])
+    await fx.afterRefresh({ myepitech: { ...myepitech, projects: [] } })
     expect(hub.prime).not.toHaveBeenCalled()
-    await fx.afterRefresh({ github, intra })
+    await fx.afterRefresh({ github, myepitech })
     expect(hub.prime).toHaveBeenCalledWith(['github:g1'], 'github')
     expect(hub.push.mock.calls.map((c) => c[0])).not.toContain('github:g1')
-    await fx.afterRefresh({ github: { ...github, notifications: [{ ...github.notifications[0]!, id: 'g3' }] }, intra })
+    await fx.afterRefresh({ github: { ...github, notifications: [{ ...github.notifications[0]!, id: 'g3' }] }, myepitech })
     expect(hub.push.mock.calls.map((c) => c[0])).toContain('github:g3')
   })
 
@@ -110,8 +123,8 @@ describe('effets après rafraîchissement', () => {
     let release!: (c: Commit | null) => void
     const lastCommit = vi.fn<LastCommit>(() => new Promise((r) => { release = r }))
     const { fx } = setup(lastCommit)
-    const a = fx.deadlines({ github, intra })
-    const b = fx.deadlines({ github, intra })
+    const a = fx.deadlines({ github, myepitech })
+    const b = fx.deadlines({ github, myepitech })
     await Promise.resolve()
     release(null)
     await Promise.all([a, b])

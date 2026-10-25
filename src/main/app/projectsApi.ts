@@ -28,7 +28,8 @@ export function createProjectsApi(deps: ProjectsApiDeps): ProjectsApi {
     const data = { github: s.github.data, intra: s.intra.data, myepitech: s.myepitech.data, teams: s.teams.data }
     return buildProjects({
       deadlines: await deps.deadlines(data),
-      results: s.myepitech.data?.results ?? [],
+      projects: s.myepitech.data?.projects ?? [],
+      runs: s.myepitech.data?.runs ?? {},
       repos: s.github.data?.repos ?? [],
       settings: deps.settings(),
       now: new Date(deps.now())
@@ -51,7 +52,7 @@ export function createProjectsApi(deps: ProjectsApiDeps): ProjectsApi {
     },
     async detail(key, force) {
       if (typeof key !== 'string') return null
-      // Une clé intranet (accueil) ou un ancien alias ouvre le projet fusionné.
+      // Une clé de rendu (accueil) ou un alias (code projet d'un passage) ouvre le projet.
       const summary = findProject(await list(), key)
       return summary ? deps.details.get(summary, !!force) : null
     }

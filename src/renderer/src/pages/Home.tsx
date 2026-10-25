@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
-import type { DeadlineView, ServiceId, Settings } from '../../../shared/types';
+import { scoreOf } from '../../../shared/score';
+import type { DeadlineView, RunSummary, ServiceId, Settings } from '../../../shared/types';
 import type { OpenFn, Snapshot } from '../App';
+import { projectKey } from '../../../shared/projects';
 import { Card } from '../components/Card';
 import { DeadlineRow } from '../components/DeadlineRow';
 import { RepoPicker } from '../components/RepoPicker';
@@ -43,8 +45,13 @@ export function Home({ snapshot, settings, onSettings, open, openProject, setVie
   };
   const common = { open, setView, refresh };
   const gh = snapshot?.github.data;
-  const results = snapshot?.myepitech.data?.results.slice(0, 5) ?? [];
-  const intra = snapshot?.intra.data;
+  const mye = snapshot?.myepitech.data;
+  const results: RunSummary[] = Object.values(mye?.runs ?? {})
+    .map((runs) => runs[0])
+    .filter((r): r is RunSummary => !!r)
+    .sort((a, b) => Date.parse(b.date) - Date.parse(a.date))
+    .slice(0, 5);
+  const profile = mye?.profile;
   const unread = snapshot?.teams.data?.unread ?? 0;
 
   return (
@@ -54,7 +61,7 @@ export function Home({ snapshot, settings, onSettings, open, openProject, setVie
         <button type="button" className="btn" disabled={refreshing} onClick={() => void refreshAll()}>{refreshing ? 'Rafraîchissement…' : 'Rafraîchir'}</button>
       </div>
       <div className="grid">
-        <Card title="À rendre bientôt" service="intra" snap={snapshot?.intra} wide {...common}>
+        <Card title="À rendre bientôt" service="myepitech" snap={snapshot?.myepitech} wide {...common}>
           {deadlines.length === 0 ? (
             <p className="dim">Aucun rendu à venir.</p>
           ) : (
@@ -96,15 +103,18 @@ export function Home({ snapshot, settings, onSettings, open, openProject, setVie
         <Card title="My Epitech" service="myepitech" snap={snapshot?.myepitech} {...common}>
           {results.length === 0 ? <p className="dim">Aucun résultat.</p> : (
             <ul className="list">
-              {results.map((r) => (
-                <li key={r.id} className="row">
-                  <div className="row-main">
-                    <button type="button" className="link" onClick={() => open('myepitech', r.url)}>{r.project}</button>
-                    <div className="dim small">{r.module}</div>
-                  </div>
-                  <strong className={r.percent >= 50 ? 'ok' : 'bad'}>{Math.round(r.percent)} %</strong>
-                </li>
-              ))}
+              {results.map((r) => {
+                const score = scoreOf(r.categories);
+                return (
+                  <li key={r.id} className="row">
+                    <div className="row-main">
+                      <button type="button" className="link" onClick={() => openProject(projectKey(r.unitCode, r.projectCode))}>{r.title}</button>
+                      <div className="dim small">{r.unitCode}</div>
+                    </div>
+                    <strong className={score !== null && score >= 50 ? 'ok' : 'bad'}>{score === null ? '—' : `${score} %`}</strong>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </Card>
@@ -114,11 +124,12 @@ export function Home({ snapshot, settings, onSettings, open, openProject, setVie
           <button type="button" className="btn" onClick={() => open('teams')}>Ouvrir Teams</button>
         </Card>
 
-        <Card title="Profil Epitech" service="intra" snap={snapshot?.intra} {...common}>
-          {intra && (
+        <Card title="Profil Epitech" service="myepitech" snap={snapshot?.myepitech} {...common}>
+          {profile && (
             <div className="stats">
-              <div><span className="big">{intra.credits}</span><span className="dim small">crédits</span></div>
-              <div><span className="big">{intra.gpa}</span><span className="dim small">GPA</span></div>
+              <div><span className="big">{profile.promotion ?? '—'}</span><span className="dim small">promo</span></div>
+              <div><span className="big">{profile.semester ?? '—'}</span><span className="dim small">semestre</span></div>
+              <div><span className="big">{profile.gpa ?? '—'}</span><span className="dim small">GPA</span></div>
             </div>
           )}
         </Card>

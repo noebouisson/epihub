@@ -1,13 +1,13 @@
-import { isIntraProjectUrl } from '../services/intra'
 import { NeedsLoginError } from '../services/types'
-import type { Commit, ProjectDetail, ProjectSummary, PullSummary, RepoActivity, ResultsData, Section, SkillReport, SubjectData, TestRun } from '../../shared/types'
+import { scoreOf } from '../../shared/score'
+import type { Commit, MyEpitechData, ProjectDetail, ProjectSummary, PullSummary, RepoActivity, ResultsData, RunDetail, Section, SkillReport, SubjectData, TestRun } from '../../shared/types'
 
 const TTL = 5 * 60_000
 
 export interface ProjectDetailsDeps {
-  intra: { projectDetails(url: string): Promise<SubjectData> }
   github: { recentCommits(fullName: string, branch: string): Promise<Commit[]>; openPulls(fullName: string): Promise<PullSummary[]> }
-  myepitech: { history(module: string, slug: string): Promise<TestRun[]>; runDetails(testRunId: string): Promise<SkillReport[]> }
+  /** `data()` : dernières données My Epitech (projets et passages) ; `runDetail` : détail d'un passage. */
+  myepitech: { data(): MyEpitechData | null; runDetail(runId: string): Promise<RunDetail> }
   now(): number
 }
 
@@ -25,6 +25,16 @@ async function section<T>(run: () => Promise<T>): Promise<Section<T>> {
   }
 }
 
+/** Détail d'un passage → compétences affichées par la page projet. */
+export function skillReports(detail: RunDetail): SkillReport[] {
+  return detail.categories.map((c) => ({
+    name: c.name,
+    passed: c.tests.filter((t) => t.passed).length,
+    count: c.tests.length,
+    tests: c.tests.map((t) => ({ name: t.name, passed: t.passed, crashed: t.crashed }))
+  }))
+}
+
 const signature = (s: ProjectSummary): string =>
   [s.key, s.deadline?.url ?? '', s.repo ? `${s.repo.fullName}@${s.repo.defaultBranch}` : '', s.lastResult?.id ?? ''].join('|')
 
@@ -36,10 +46,13 @@ export function createProjectDetails(deps: ProjectDetailsDeps): { get(summary: P
   const cache = new Map<string, { sig: string; at: number; sections: Partial<Sections> }>()
 
   const loaders = (s: ProjectSummary): { [K in keyof Sections]: () => Promise<Sections[K]> } => {
-    const { deadline, repo, lastResult } = s
+    const { repo, lastResult, projectId } = s
     return {
-      subject: async () =>
-        deadline && isIntraProjectUrl(deadline.url) ? section<SubjectData>(() => deps.intra.projectDetails(deadline.url)) : unavailable<SubjectData>(),
+      // Sujet = description du projet My Epitech (déjà chargée) : aucun appel réseau, pas de fichiers.
+      subject: async () => {
+        const project = projectId ? deps.myepitech.data()?.projects.find((p) => p.id === projectId) : undefined
+        return project?.description.trim() ? { state: 'ok', data: { description: project.description, files: [] } } : unavailable<SubjectData>()
+      },
       repo: async () =>
         repo
           ? section<RepoActivity>(async () => {
@@ -48,14 +61,17 @@ export function createProjectDetails(deps: ProjectDetailsDeps): { get(summary: P
             })
           : unavailable<RepoActivity>(),
       results: async () =>
-        lastResult?.slug
+        lastResult && projectId
           ? section<ResultsData>(async () => {
-              const runs = await deps.myepitech.history(lastResult.module, lastResult.slug)
+              const list = deps.myepitech.data()?.runs[projectId] ?? [lastResult]
+              const runs: TestRun[] = list
+                .map((r) => ({ id: r.id, date: r.date, percent: scoreOf(r.categories) ?? 0 }))
+                .sort((a, b) => Date.parse(a.date) - Date.parse(b.date))
               const last = runs[runs.length - 1]
               if (!last) return { runs, latest: [] }
               // L'historique est la donnée de la section ; le détail du dernier passage est au mieux.
               try {
-                return { runs, latest: await deps.myepitech.runDetails(last.id) }
+                return { runs, latest: skillReports(await deps.myepitech.runDetail(last.id)) }
               } catch (err) {
                 return { runs, latest: [], latestError: err instanceof Error ? err.message : String(err) }
               }

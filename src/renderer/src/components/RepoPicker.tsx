@@ -37,8 +37,8 @@ export function RepoPicker({ deadline, title, current, onSelect, repos, settings
     else links[deadline.id] = fullName;
     const patch: Partial<Settings> = { repoLinks: links };
     // Un repo lié sur la page projet est prioritaire : on le met à jour aussi (sous chaque alias) pour que ce choix s'applique.
-    const intraKey = projectKey(deadline.moduleCode, deadline.title);
-    const project = findProject(await window.epihub.projects().catch(() => []), intraKey) ?? { key: intraKey, aliases: [] };
+    const deadlineKey = projectKey(deadline.moduleCode, deadline.title);
+    const project = findProject(await window.epihub.projects().catch(() => []), deadlineKey) ?? { key: deadlineKey, aliases: [] };
     if (resolveLink(settings.projectRepoLinks, project) !== null) patch.projectRepoLinks = linkPatch(settings.projectRepoLinks, project, fullName);
     onSaved(await window.epihub.updateSettings(patch));
     onClose();

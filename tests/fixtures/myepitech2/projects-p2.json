@@ -1,0 +1,15 @@
+{
+  "data": [
+    {
+      "id": 205,
+      "name": "Pool Day 01",
+      "fullName": "G-CPE-100 - Pool Day 01",
+      "description": "",
+      "startDate": "2026-09-01T08:00:00Z",
+      "endDate": "2026-09-25T22:00:00Z",
+      "isUserRegistered": true,
+      "unitInstance": { "code": "G-CPE-100-LYN-1-1", "unitCode": "G-CPE-100", "name": "C Pool" }
+    }
+  ],
+  "meta": { "page": 2, "limit": 2, "total": 3, "pages": 2, "hasNext": false, "hasPrev": true }
+}

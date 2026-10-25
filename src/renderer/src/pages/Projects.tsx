@@ -10,7 +10,7 @@ interface Props {
   openProject(key: string): void;
 }
 
-const LOGIN_LABEL = { intra: "Ouvrir l'intranet", myepitech: 'Ouvrir My Epitech' } as const;
+const LOGIN_LABEL = { myepitech: 'Ouvrir My Epitech' } as const;
 
 function Row({ p, openProject }: { p: ProjectSummary; openProject(key: string): void }): JSX.Element {
   const d = p.deadline;
@@ -29,7 +29,7 @@ function Row({ p, openProject }: { p: ProjectSummary; openProject(key: string): 
 }
 
 function EmptyList({ snapshot, open }: { snapshot: Snapshot | null; open: OpenFn }): JSX.Element {
-  const empty = emptyProjects({ intra: snapshot?.intra.status.state, myepitech: snapshot?.myepitech.status.state });
+  const empty = emptyProjects({ myepitech: snapshot?.myepitech.status.state });
   return (
     <div className="stack-sm">
       <p className="dim">{empty.message}</p>

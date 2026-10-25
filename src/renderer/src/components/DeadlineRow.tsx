@@ -19,7 +19,7 @@ export function DeadlineRow({ deadline: d, open, openProject, toast, onLink }: P
     <li className={`row${d.alert ? ` row-${d.alert}` : ''}`}>
       <div className="row-main">
         <button type="button" className="link" onClick={() => openProject(projectKey(d.moduleCode, d.title))}>{d.title}</button>{' '}
-        <button type="button" className="link small" onClick={() => open('intra', d.url)}>intranet</button>
+        <button type="button" className="link small" onClick={() => open('myepitech', d.url)}>My Epitech</button>
         <div className="dim small">
           <span className="tag">{d.moduleCode}</span> <strong>{relativeTime(d.end, now)}</strong>
           {d.alert && <span className={`badge badge-${d.alert === 'urgent' ? 'danger' : 'warn'}`}>{d.alert === 'urgent' ? 'Urgent' : 'Attention'}</span>}

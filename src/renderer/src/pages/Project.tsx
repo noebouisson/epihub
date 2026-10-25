@@ -8,6 +8,9 @@ import { TeamsLinkEditor } from '../components/TeamsLinkEditor';
 import { findProject, isTeamsUrl, linkPatch, resolveLink } from '../../../shared/projects';
 import { projectPage, scoreLine } from '../projectView';
 import { relativeTime } from '../time';
+import { SERVICE_HOMES } from '../../../shared/domains';
+
+const MYEPITECH_HOME = SERVICE_HOMES.myepitech;
 
 interface Props {
   projectKey: string;
@@ -94,9 +97,9 @@ export function Project({ projectKey: key, settings, repos, open, toast, onSetti
   const d = summary.deadline;
   const score = scoreLine(summary.lastResult);
   const teamsUrl = settings ? resolveLink(settings.projectTeamsLinks, summary, isTeamsUrl) : summary.teamsUrl;
-  const shareUrl = d?.url ?? summary.lastResult?.url ?? null;
+  const myepitechUrl = d?.url ?? (summary.projectId ? MYEPITECH_HOME : null);
+  const shareUrl = myepitechUrl;
   const linked = summary.repo;
-  const myepitechUrl = summary.lastResult?.url ?? null;
   const subject = detail?.subject;
   const repo = detail?.repo;
   const results = detail?.results;
@@ -116,21 +119,20 @@ export function Project({ projectKey: key, settings, repos, open, toast, onSetti
           {d?.alert && <span className={`badge badge-${d.alert === 'urgent' ? 'danger' : 'warn'}`}>{d.alert === 'urgent' ? 'Urgent' : 'Attention'}</span>}
         </div>
         <div className="form-row wrap">
-          {d && <button type="button" className="btn btn-small" onClick={() => open('intra', d.url)}>Ouvrir sur l'intranet</button>}
           {myepitechUrl && <button type="button" className="btn btn-small" onClick={() => open('myepitech', myepitechUrl)}>Ouvrir sur My Epitech</button>}
         </div>
       </header>
 
       <div className="grid">
-        <Card title="Sujet" badge={<SectionBadge section={subject} service="intra" open={open} retry={retry} />}>
-          {subject?.state === 'unavailable' && <p className="dim">Pas de sujet sur l'intranet pour ce projet</p>}
+        <Card title="Sujet" badge={<SectionBadge section={subject} service="myepitech" open={open} retry={retry} />}>
+          {subject?.state === 'unavailable' && <p className="dim">Pas de description sur My Epitech pour ce projet</p>}
           {subject?.state === 'ok' && subject.data && (
             <>
               {subject.data.description && <p className="description">{subject.data.description}</p>}
               {subject.data.files.length > 0 && (
                 <ul className="list">
                   {subject.data.files.map((f) => (
-                    <li key={f.url} className="row"><button type="button" className="link" onClick={() => open('intra', f.url)}>{f.title}</button></li>
+                    <li key={f.url} className="row"><button type="button" className="link" onClick={() => open('myepitech', f.url)}>{f.title}</button></li>
                   ))}
                 </ul>
               )}
@@ -234,7 +236,7 @@ export function Project({ projectKey: key, settings, repos, open, toast, onSetti
           repos={repos}
           settings={settings}
           onSelect={async (fullName) => {
-            // Écrit sous chaque alias : l'accueil (clé intranet) et la page projet voient le même repo.
+            // Écrit sous chaque alias : l'accueil (clé du rendu) et la page projet voient le même repo.
             afterLinkChange(await window.epihub.updateSettings({ projectRepoLinks: linkPatch(settings.projectRepoLinks, summary, fullName) }));
           }}
           onSaved={onSettings}

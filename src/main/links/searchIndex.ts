@@ -1,5 +1,6 @@
 import Fuse from 'fuse.js'
 import type { GhItem, ProjectSummary, SearchItem, ServiceDataMap, ServiceId } from '../../shared/types'
+import { normalize } from './repoMatcher'
 
 type Snapshot = Partial<{ [K in ServiceId]: ServiceDataMap[K] | null }>
 
@@ -33,8 +34,8 @@ export function buildSearchItems(snap: Snapshot, projects: ProjectSummary[] = []
     gh.reviewRequests.forEach(ghItem)
     gh.assignedIssues.forEach(ghItem)
   }
-  for (const d of snap.intra?.deadlines ?? [])
-    add({ id: `deadline:${d.id}`, kind: 'deadline', title: d.title, subtitle: `${d.moduleCode} · ${d.projectCode}`, service: 'intra', url: d.url, date: d.end })
+  for (const p of snap.myepitech?.projects ?? [])
+    add({ id: `deadline:mye-${p.id}`, kind: 'deadline', title: p.name, subtitle: `${p.unitCode} · ${normalize(p.name)}`, service: 'myepitech', url: p.url, date: p.end })
   for (const p of projects) add({ id: `project:${p.key}`, kind: 'project', title: p.title, subtitle: p.moduleCode, service: 'app', url: '' })
   return out
 }

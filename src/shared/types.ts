@@ -9,15 +9,16 @@ export interface GhItem { id: number; title: string; repo: string; url: string; 
 export interface GithubData { login: string; notifications: GhNotification[]; reviewRequests: GhItem[]; assignedIssues: GhItem[]; repos: Repo[] }
 
 export interface Deadline { id: string; moduleCode: string; projectCode: string; title: string; end: string /* ISO */; url: string }
-export interface IntraEvent { id: string; title: string; start: string; end: string; url: string }
-export interface IntraNotification { id: string; title: string; date: string }
-export interface IntraData { login: string; promo: number; credits: number; gpa: string; deadlines: Deadline[]; events: IntraEvent[]; notifications: IntraNotification[] }
 
-export interface TestResult { id: string; project: string; module: string; slug: string; date: string; percent: number; url: string }
-export interface MyEpitechData { results: TestResult[] }
+/** Projet My Epitech auquel l'étudiant est inscrit. */
+export interface MyProject { id: string; name: string; unitCode: string; unitName: string; description: string; start: string; end: string; url: string }
+export interface MyProfile { login: string; name: string; promotion: number | null; semester: number | null; gpa: string | null; cursus: string | null }
+/** `runs` : passages par id de projet, du plus récent au plus ancien. */
+export interface MyEpitechData { profile: MyProfile; projects: MyProject[]; runs: Record<string, RunSummary[]> }
 export interface TeamsData { unread: number }
 
-export interface ServiceDataMap { github: GithubData; intra: IntraData; myepitech: MyEpitechData; teams: TeamsData }
+/** `intra` reste un onglet mais ne fournit plus aucune donnée. */
+export interface ServiceDataMap { github: GithubData; intra: null; myepitech: MyEpitechData; teams: TeamsData }
 export interface ServiceSnapshot<K extends ServiceId = ServiceId> { status: ServiceStatus; data: ServiceDataMap[K] | null }
 
 export type AlertLevel = 'warning' | 'urgent';
@@ -28,9 +29,9 @@ export interface SearchItem { id: string; kind: 'repo' | 'pr' | 'issue' | 'deadl
 export interface Settings { repoLinks: Record<string /* deadline id */, string /* repo fullName */>; projectRepoLinks: Record<string /* projectKey */, string /* repo fullName */>; projectTeamsLinks: Record<string /* projectKey */, string /* URL Teams */>; notify: Record<ServiceId, boolean>; theme: 'dark' | 'light' }
 
 export interface ProjectSummary {
-  /** Clé canonique (clé du slug My Epitech s'il y a un résultat, sinon clé intranet) ; `aliases` : toutes les clés du projet. */
-  key: string; aliases: string[]; title: string; moduleCode: string
-  deadline: DeadlineView | null; lastResult: TestResult | null
+  /** Clé canonique `projectKey(unitCode, nom)` ; `aliases` : toutes les clés du projet (dont celles des codes projet des passages). */
+  key: string; aliases: string[]; projectId: string | null; title: string; moduleCode: string
+  deadline: DeadlineView | null; lastResult: RunSummary | null
   repo: Repo | null; teamsUrl: string | null; status: 'en-cours' | 'termine'
 }
 export type SectionState = 'loading' | 'ok' | 'needs-login' | 'error' | 'unavailable'

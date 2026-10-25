@@ -1,0 +1,16 @@
+{
+  "results": [
+    {
+      "id": 9000,
+      "context": { "unitCode": "G-CPE-101", "projectCode": "myprintf", "title": "My printf", "year": 2026 },
+      "properties": { "date": "2026-10-18T09:00:00Z", "commit": "1111111", "group": { "members": ["jane.doe@epitech.eu"] } },
+      "failureFlags": [],
+      "prerequisitesMark": 1,
+      "codingStyle": { "penalty": null, "value": { "fatal": 0, "major": 0, "minor": 1, "info": 2 } },
+      "coverage": { "Default": { "linePercentage": 55.5, "branchPercentage": 30 } },
+      "skillBreakdowns": { "01 - base tests": { "count": 4, "passed": 3, "crashed": 0, "mandatoryFailed": 0 } },
+      "repoLink": null,
+      "achievementSummary": { "passed": 1, "total": 2 }
+    }
+  ]
+}

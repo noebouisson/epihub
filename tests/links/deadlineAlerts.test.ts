@@ -45,6 +45,6 @@ describe('buildDeadlineViews', () => {
 })
 
 describe('alertKey', () => {
-  test('dépend du niveau', () => expect(alertKey({ ...view, id: 'acti-1', alert: 'urgent' })).toBe('intra:deadline:acti-1:urgent'))
+  test('dépend du niveau', () => expect(alertKey({ ...view, id: 'mye-1', alert: 'urgent' })).toBe('myepitech:deadline:mye-1:urgent'))
   test('sans alerte → null', () => expect(alertKey(view)).toBeNull())
 })

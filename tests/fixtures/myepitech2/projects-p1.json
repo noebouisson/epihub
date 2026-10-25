@@ -1,0 +1,25 @@
+{
+  "data": [
+    {
+      "id": 101,
+      "name": "My printf",
+      "fullName": "G-CPE-101 - My printf",
+      "description": "Recode la fonction printf de la libC.",
+      "startDate": "2026-10-13T08:00:00Z",
+      "endDate": "2026-11-15T22:00:00Z",
+      "isUserRegistered": true,
+      "unitInstance": { "code": "G-CPE-101-LYN-1-1", "unitCode": "G-CPE-101", "name": "Unix & C Lab Seminar" }
+    },
+    {
+      "id": 150,
+      "name": "Other project",
+      "fullName": "G-CPE-110 - Other project",
+      "description": "Projet non inscrit.",
+      "startDate": "2026-10-13T08:00:00Z",
+      "endDate": "2026-11-20T22:00:00Z",
+      "isUserRegistered": false,
+      "unitInstance": { "code": "G-CPE-110-LYN-1-1", "unitCode": "G-CPE-110", "name": "Unix & C Lab" }
+    }
+  ],
+  "meta": { "page": 1, "limit": 2, "total": 3, "pages": 2, "hasNext": true, "hasPrev": false }
+}

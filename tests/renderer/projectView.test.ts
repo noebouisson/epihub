@@ -1,11 +1,10 @@
 import { expect, test } from 'vitest';
 import { emptyProjects, projectPage, scoreLine } from '../../src/renderer/src/projectView';
 
-test('liste vide : invitation à se connecter si intranet ou My Epitech demande une connexion', () => {
-  const login = { message: "Connecte-toi à l'intranet et à My Epitech pour voir tes projets", login: ['intra', 'myepitech'] };
-  expect(emptyProjects({ intra: 'needs-login', myepitech: 'ok' })).toEqual(login);
-  expect(emptyProjects({ intra: 'ok', myepitech: 'needs-login' })).toEqual(login);
-  expect(emptyProjects({ intra: 'ok', myepitech: 'ok' })).toEqual({ message: 'Aucun projet', login: [] });
+test('liste vide : invitation à se connecter si My Epitech demande une connexion', () => {
+  const login = { message: 'Connecte-toi à My Epitech pour voir tes projets', login: ['myepitech'] };
+  expect(emptyProjects({ myepitech: 'needs-login' })).toEqual(login);
+  expect(emptyProjects({ myepitech: 'ok' })).toEqual({ message: 'Aucun projet', login: [] });
   expect(emptyProjects({})).toEqual({ message: 'Aucun projet', login: [] });
 });
 
@@ -21,6 +20,8 @@ test('page projet : échec avec résumé connu → erreur avec réessai, jamais 
 });
 
 test('score du dernier passage', () => {
-  expect(scoreLine({ percent: 66.6 })).toBe('Dernier score : 67 %');
+  const cat = (count: number, passed: number) => ({ count, passed, crashed: 0, mandatoryFailed: 0 });
+  expect(scoreLine({ categories: { a: cat(2, 1), b: cat(1, 1) } })).toBe('Dernier score : 67 %');
+  expect(scoreLine({ categories: {} })).toBe('Dernier passage sans test');
   expect(scoreLine(null)).toBeNull();
 });

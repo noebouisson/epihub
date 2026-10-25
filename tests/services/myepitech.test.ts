@@ -1,148 +1,209 @@
 import { readFileSync } from 'node:fs'
-import { describe, expect, test } from 'vitest'
-import { createMyEpitechService, isExpiredJwt, scholarYear, tokenFromStorage, usableToken } from '../../src/main/services/myepitech'
-import { NeedsLoginError, type FetchLike } from '../../src/main/services/types'
+import { join } from 'node:path'
+import { describe, expect, test, vi } from 'vitest'
+import {
+  createMyEpitechService,
+  decodeProfile,
+  decodeProject,
+  decodeRunDetail,
+  decodeRunSummary
+} from '../../src/main/services/myepitech'
+import { NeedsLoginError } from '../../src/main/services/types'
 
-const me = readFileSync('tests/fixtures/myepitech/me.json', 'utf8')
-const mk = (body: string, status = 200, calls: { url: string; headers?: Record<string, string> }[] = []): FetchLike =>
-  async (url, init) => {
-    calls.push({ url, headers: init?.headers })
-    return { status, ok: status < 400, headers: { get: () => null }, text: async () => body }
-  }
-const now = () => new Date(2026, 9, 24)
+const fx = (name: string): string => readFileSync(join(__dirname, '../fixtures/myepitech2', name), 'utf8')
+const json = (name: string): any => JSON.parse(fx(name))
+const BASE = 'https://my.epitech.eu/api'
+const HOUR = 3600e3
 
-describe('my epitech', () => {
-  test('scholarYear', () => {
-    expect(scholarYear(new Date('2026-10-24'))).toBe(2026)
-    expect(scholarYear(new Date('2027-03-01'))).toBe(2026)
+type Reply = { status: number; body: string }
+const ok = (body: string): Reply => ({ status: 200, body })
+const routes = (): Record<string, Reply> => ({
+  '/students/profile': ok(fx('profile.json')),
+  '/units/instances/projects?page=1': ok(fx('projects-p1.json')),
+  '/units/instances/projects?page=2': ok(fx('projects-p2.json')),
+  '/units/instances/projects/101/test-results': ok(fx('test-results.json')),
+  '/units/instances/projects/205/test-results': { status: 400, body: '{"message":"Project slug not found"}' },
+  '/students/test-results/9001': ok(fx('run-detail.json')),
+  '/students/test-results/history/2026/G-CPE-101/myprintf': ok(fx('history.json'))
+})
+
+function setup(table: Record<string, Reply> = routes(), start = Date.parse('2026-10-25T12:00:00Z')) {
+  const clock = { t: start }
+  const calls: string[] = []
+  const auths: (string | undefined)[] = []
+  const fetch = vi.fn(async (url: string, init?: { headers?: Record<string, string> }) => {
+    const path = url.slice(BASE.length)
+    calls.push(path)
+    auths.push(init?.headers?.Authorization)
+    const r = table[path] ?? { status: 404, body: '{"message":"Not found"}' }
+    return { status: r.status, ok: r.status >= 200 && r.status < 300, headers: { get: () => null }, text: async () => r.body }
   })
-  test('calcule le pourcentage, trié par date décroissante', async () => {
-    const calls: { url: string; headers?: Record<string, string> }[] = []
-    const svc = createMyEpitechService(mk(me, 200, calls), async () => 'tok', now)
-    const r = (await svc.refresh()).results
-    expect(r[0]).toMatchObject({
-      id: '1002',
-      project: 'Day 01',
-      module: 'G-CPE-100',
-      slug: 'cpoolday01',
-      percent: 75,
-      url: 'https://my.epitech.eu/index.html#d/2026/G-CPE-100/cpoolday01/1002'
+  const auth = { getToken: vi.fn(async (): Promise<string | null> => 'tok'), invalidate: vi.fn() }
+  const svc = createMyEpitechService({ fetch, auth, now: () => clock.t })
+  return { svc, fetch, auth, calls, auths, clock, table }
+}
+
+describe('décodage', () => {
+  test('profil', () => {
+    expect(decodeProfile(json('profile.json'))).toEqual({ login: 'jane.doe@epitech.eu', name: 'Jane Doe', promotion: 2030, semester: 1, gpa: null, cursus: 'Programme Grande École' })
+    expect(decodeProfile({ ...json('profile.json'), gpa: 3.25 }).gpa).toBe('3.25')
+    expect(decodeProfile({ ...json('profile.json'), gpa: { value: 2.5 } }).gpa).toBe('2.5')
+    expect(decodeProfile({ ...json('profile.json'), gpa: {}, promotion: null, semester: undefined, cursus: null })).toMatchObject({ gpa: null, promotion: null, semester: null, cursus: null })
+  })
+  test('projet', () => {
+    expect(decodeProject(json('projects-p1.json').data[0])).toEqual({
+      id: '101', name: 'My printf', unitCode: 'G-CPE-101', unitName: 'Unix & C Lab Seminar',
+      description: 'Recode la fonction printf de la libC.', start: '2026-10-13T08:00:00Z', end: '2026-11-15T22:00:00Z', url: 'https://my.epitech.eu/'
     })
-    expect(r[1].id).toBe('1001')
-    expect(calls[0].url).toBe('https://api.epitest.eu/me/2026')
-    expect(calls[0].headers?.Authorization).toBe('Bearer tok')
   })
-  test('sans token → NeedsLoginError', async () => {
-    await expect(createMyEpitechService(mk(me), async () => null).refresh()).rejects.toBeInstanceOf(NeedsLoginError)
+  test('passage', () => {
+    const r = decodeRunSummary(json('test-results.json').results[1])
+    expect(r).toEqual({
+      id: '9001', unitCode: 'G-CPE-101', projectCode: 'myprintf', title: 'My printf', year: 2026,
+      date: '2026-10-20T10:00:00Z', commit: '2222222', members: ['jane.doe@epitech.eu', 'octocat@epitech.eu'], failureFlags: ['no-test-passed'],
+      style: { fatal: 0, major: 1, minor: 3, info: 0, penalty: 2 }, coverage: { lines: 40, branches: 25 },
+      categories: { '01 - base tests': { count: 4, passed: 0, crashed: 1, mandatoryFailed: 1 } },
+      repoLink: 'https://github.com/octocat/G-CPE-101-myprintf'
+    })
+    expect(decodeRunSummary(json('history.json').results[0]).style.penalty).toBeNull()
   })
-  test('401 → NeedsLoginError', async () => {
-    await expect(createMyEpitechService(mk('{}', 401), async () => 't', now).refresh()).rejects.toBeInstanceOf(NeedsLoginError)
+  test('détail : erreurs et fonctions interdites', () => {
+    const raw = json('run-detail.json')
+    expect(decodeRunDetail(raw)).toMatchObject({ deliveryError: null, makeError: null, bannedFunctions: [], coverage: { lines: 40, branches: 25 } })
+    const d = decodeRunDetail({ ...raw, deliveryError: 'Dépôt vide', makeError: { output: 'gcc: error' }, bannedFunctions: { printf: ['main.c'], puts: [] } })
+    expect(d).toMatchObject({ deliveryError: 'Dépôt vide', makeError: '{"output":"gcc: error"}', bannedFunctions: ['printf', 'puts'] })
+    expect(decodeRunDetail({ ...raw, bannedFunctions: ['system'] }).bannedFunctions).toEqual(['system'])
+    expect(decodeRunDetail({ ...raw, coverage: { Default: { coveredLines: 0, totalLines: 0 } } }).coverage).toEqual({ lines: null, branches: null })
   })
-  test('skills vides → 0 %', async () => {
-    const empty = JSON.stringify([{ id: 'x', date: '2026-10-24T10:00:00Z', project: { name: 'P', slug: 'p', module: { code: 'M' } }, results: { skills: {} } }])
-    const svc = createMyEpitechService(mk(empty), async () => 't', now)
-    expect((await svc.refresh()).results[0].percent).toBe(0)
-  })
-  test('sans testRunId → id de l’entrée', async () => {
-    const svc = createMyEpitechService(mk(JSON.stringify([{ id: 'x9', date: '2026-10-24T10:00:00Z', project: { name: 'P', slug: 'p', module: { code: 'M' } }, results: {} }])), async () => 't', now)
-    const r = (await svc.refresh()).results[0]
-    expect(r.id).toBe('x9')
-    expect(r.url.endsWith('/p/x9')).toBe(true)
-  })
-})
-
-const jwt = (payload: object): string => `h.${Buffer.from(JSON.stringify(payload)).toString('base64url')}.s`
-describe('token My Epitech', () => {
-  const NOW = Date.parse('2026-10-24T12:00:00Z')
-  test('valeur du localStorage entre guillemets', () => {
-    expect(tokenFromStorage('"abc"')).toBe('abc')
-    expect(tokenFromStorage(null)).toBeNull()
-    expect(tokenFromStorage('""')).toBeNull()
-  })
-  test('JWT expiré détecté', () => {
-    expect(isExpiredJwt(jwt({ exp: NOW / 1000 - 60 }), NOW)).toBe(true)
-    expect(isExpiredJwt(jwt({ exp: NOW / 1000 + 3600 }), NOW)).toBe(false)
-    expect(isExpiredJwt(jwt({}), NOW)).toBe(false)
-    expect(isExpiredJwt('opaque-token', NOW)).toBe(false)
-    expect(isExpiredJwt('a.%%%.c', NOW)).toBe(false)
-  })
-  test('usableToken : un JWT expiré est traité comme absent', () => {
-    const live = jwt({ exp: NOW / 1000 + 3600 })
-    expect(usableToken(JSON.stringify(live), NOW)).toBe(live)
-    expect(usableToken(JSON.stringify(jwt({ exp: 1 })), NOW)).toBeNull()
+  test('format inattendu → erreur claire', () => {
+    for (const bad of [null, 'x', [], { context: {} }]) expect(() => decodeRunSummary(bad)).toThrow('Format My Epitech inattendu')
+    expect(() => decodeProject({ id: 1 })).toThrow('Format My Epitech inattendu')
+    expect(() => decodeProfile({})).toThrow('Format My Epitech inattendu')
+    expect(() => decodeRunDetail({ skills: 'nope' })).toThrow('Format My Epitech inattendu')
   })
 })
 
-describe('my epitech à la demande', () => {
-  const history = readFileSync('tests/fixtures/myepitech/history.json', 'utf8')
-  const details = readFileSync('tests/fixtures/myepitech/details.json', 'utf8')
-  test('history : trié, pourcentages', async () => {
-    const calls: { url: string; headers?: Record<string, string> }[] = []
-    const myepi = createMyEpitechService(mk(history, 200, calls), async () => 'tok', now)
-    const runs = await myepi.history('G-CPE-100', 'cpoolday01')
-    expect(runs.map((r) => r.percent)).toEqual([25, 50, 75])
-    expect(runs.map((r) => r.id)).toEqual(['3001', '3002', '3003'])
-    expect(calls[0].url).toBe('https://api.epitest.eu/me/2026/G-CPE-100/cpoolday01')
-    expect(calls[0].headers?.Authorization).toBe('Bearer tok')
+describe('createMyEpitechService', () => {
+  test('profil, projets paginés, seulement inscrits', async () => {
+    const { svc, auths } = setup()
+    const d = await svc.refresh()
+    expect(d.projects.map((p) => p.id)).toEqual(['101', '205'])
+    expect(d.profile).toMatchObject({ login: 'jane.doe@epitech.eu', promotion: 2030 })
+    expect(auths.every((a) => a === 'Bearer tok')).toBe(true)
   })
-  test('history : composants encodés', async () => {
-    const calls: { url: string }[] = []
-    await createMyEpitechService(mk(history, 200, calls), async () => 't', now).history('G CPE', 'a/b')
-    expect(calls[0].url).toBe('https://api.epitest.eu/me/2026/G%20CPE/a%2Fb')
+
+  test('passages décodés et triés, 400 → []', async () => {
+    const d = await setup().svc.refresh()
+    expect(d.runs['101'].map((r) => r.id)).toEqual(['9001', '9000'])
+    expect(d.runs['101'][0]).toMatchObject({ id: '9001', unitCode: 'G-CPE-101', projectCode: 'myprintf', failureFlags: ['no-test-passed'] })
+    expect(d.runs['205']).toEqual([])
   })
-  test('runDetails : compte réussis / total et crash', async () => {
-    const calls: { url: string }[] = []
-    const d = await createMyEpitechService(mk(details, 200, calls), async () => 't', now).runDetails('42')
-    expect(d[0]).toMatchObject({ name: 'basics', passed: 1, count: 2 })
-    expect(d[1].tests.some((t) => t.crashed)).toBe(true)
-    expect(calls[0].url).toBe('https://api.epitest.eu/me/details/42')
+
+  test('401 → invalidate, une nouvelle tentative, puis NeedsLoginError', async () => {
+    const always401 = { status: 401, body: '{"message":"Unauthorized"}' }
+    const s = setup(new Proxy({}, { get: () => always401 }))
+    await expect(s.svc.refresh()).rejects.toBeInstanceOf(NeedsLoginError)
+    expect(s.auth.invalidate).toHaveBeenCalledTimes(1)
+    expect(s.auth.getToken).toHaveBeenCalledTimes(2)
+    expect(s.calls).toEqual(['/students/profile', '/students/profile'])
   })
-  test('history : format inattendu → erreur claire', async () => {
-    await expect(createMyEpitechService(mk('{"a":1}'), async () => 't', now).history('G-CPE-100', 'x')).rejects.toThrow('Format My Epitech inattendu')
+
+  test('401 puis succès après renouvellement', async () => {
+    const s = setup()
+    let first = true
+    const real = s.table['/students/profile']
+    Object.defineProperty(s.table, '/students/profile', { get: () => { if (first) { first = false; return { status: 401, body: '' } } return real } })
+    s.auth.getToken.mockResolvedValueOnce('old').mockResolvedValue('new')
+    const d = await s.svc.refresh()
+    expect(d.profile.login).toBe('jane.doe@epitech.eu')
+    expect(s.auths.slice(0, 2)).toEqual(['Bearer old', 'Bearer new'])
   })
-  test('history : champ manquant → erreur claire', async () => {
-    await expect(createMyEpitechService(mk('[{"id":"x"}]'), async () => 't', now).history('M', 'x')).rejects.toThrow('Format My Epitech inattendu')
+
+  test('pas de jeton → NeedsLoginError', async () => {
+    const { svc, auth, fetch } = setup()
+    auth.getToken.mockResolvedValue(null)
+    await expect(svc.refresh()).rejects.toBeInstanceOf(NeedsLoginError)
+    expect(fetch).not.toHaveBeenCalled()
   })
-  test('runDetails : format inattendu → erreur claire', async () => {
-    await expect(createMyEpitechService(mk('{"results":{}}'), async () => 't', now).runDetails('42')).rejects.toThrow('Format My Epitech inattendu')
+
+  test('erreur HTTP autre → message sans jeton', async () => {
+    const t = routes()
+    t['/students/profile'] = { status: 500, body: 'oops' }
+    await expect(setup(t).svc.refresh()).rejects.toThrow('My Epitech HTTP 500')
   })
-  test('runDetails : skills en objet indexé par nom', async () => {
-    const obj = readFileSync('tests/fixtures/myepitech/details-object.json', 'utf8')
-    const d = await createMyEpitechService(mk(obj), async () => 't', now).runDetails('43')
-    expect(d).toMatchObject([{ name: 'basics', passed: 2, count: 2 }, { name: 'edge cases', passed: 0, count: 1 }])
-    expect(d[1].tests[0].crashed).toBe(true)
+
+  test('projets inactifs : passages refaits au plus toutes les 6 h ; actifs à chaque cycle', async () => {
+    const { svc, calls, clock } = setup()
+    const count = (id: string): number => calls.filter((c) => c === `/units/instances/projects/${id}/test-results`).length
+    await svc.refresh()
+    clock.t += HOUR
+    await svc.refresh()
+    expect(count('205')).toBe(1)
+    expect(count('101')).toBe(2)
+    clock.t += 5 * HOUR
+    const d = await svc.refresh()
+    expect(count('205')).toBe(2)
+    expect(d.runs['205']).toEqual([])
   })
-  test('runDetails : test sans nom → erreur claire', async () => {
-    const bad = '{"results":{"skills":[{"FullSkillReport":{"name":"a","tests":[{"passed":true}]}}]}}'
-    await expect(createMyEpitechService(mk(bad), async () => 't', now).runDetails('1')).rejects.toThrow('Format My Epitech inattendu')
+
+  test('projet terminé depuis moins de 14 jours : actif', async () => {
+    const { svc, calls, clock } = setup(routes(), Date.parse('2026-10-05T12:00:00Z'))
+    await svc.refresh()
+    clock.t += HOUR
+    await svc.refresh()
+    expect(calls.filter((c) => c.endsWith('/205/test-results'))).toHaveLength(2)
   })
-  test('history : sans id ni testRunId, ou date illisible → erreur claire', async () => {
-    for (const body of ['[{"date":"2026-10-24T10:00:00Z","results":{}}]', '[{"id":"x","date":"hier","results":{}}]']) {
-      await expect(createMyEpitechService(mk(body), async () => 't', now).history('M', 'x')).rejects.toThrow('Format My Epitech inattendu')
-    }
+
+  test('passages d’un projet en échec réseau : derniers connus conservés', async () => {
+    const s = setup()
+    const first = await s.svc.refresh()
+    s.table['/units/instances/projects/101/test-results'] = { status: 503, body: '' }
+    s.clock.t += HOUR
+    const d = await s.svc.refresh()
+    expect(d.runs['101']).toEqual(first.runs['101'])
   })
-  test('runDetails : 401 → NeedsLoginError', async () => {
-    await expect(createMyEpitechService(mk('{}', 401), async () => 't', now).runDetails('42')).rejects.toBeInstanceOf(NeedsLoginError)
+
+  test('concurrence max 4 pour les passages', async () => {
+    const t = routes()
+    const many = Array.from({ length: 10 }, (_, i) => ({ ...json('projects-p1.json').data[0], id: 500 + i, name: `P${i}` }))
+    t['/units/instances/projects?page=1'] = ok(JSON.stringify({ data: many, meta: { page: 1, limit: 10, total: 10, pages: 1, hasNext: false, hasPrev: false } }))
+    let live = 0
+    let peak = 0
+    const s = setup(t)
+    const inner = s.fetch.getMockImplementation()!
+    s.fetch.mockImplementation(async (url, init) => {
+      if (!url.includes('test-results')) return inner(url, init)
+      live++
+      peak = Math.max(peak, live)
+      await new Promise((r) => setTimeout(r, 2))
+      live--
+      return { status: 400, ok: false, headers: { get: () => null }, text: async () => '{}' }
+    })
+    const d = await s.svc.refresh()
+    expect(Object.keys(d.runs)).toHaveLength(10)
+    expect(peak).toBeLessThanOrEqual(4)
+    expect(peak).toBeGreaterThan(1)
   })
-  test('history / runDetails sans token → NeedsLoginError', async () => {
-    const svc = createMyEpitechService(mk(history), async () => null, now)
-    await expect(svc.history('M', 'x')).rejects.toBeInstanceOf(NeedsLoginError)
-    await expect(svc.runDetails('1')).rejects.toBeInstanceOf(NeedsLoginError)
+
+  test('runDetail décodé', async () => {
+    const d = await setup().svc.runDetail('9001')
+    expect(d.categories[0].tests.some((t) => t.crashed)).toBe(true)
+    expect(d.categories[0].tests.some((t) => t.mandatory)).toBe(true)
+    expect(d.categories.map((c) => c.name)).toEqual(['01 - base tests', '02 - flags'])
+    expect(d.coverage.lines).toBe(40)
   })
-  test('runDetails : enveloppe quelconque à une clé et compétence sans tests', async () => {
-    const body = JSON.stringify({ results: { skills: {
-      a: { BreakdownSkillReport: { name: 'a', breakdown: {}, passed: 3, count: 4 } },
-      b: { OtherReport: { name: 'b', tests: [{ name: 't', passed: true, crashed: false }] } },
-      c: { name: 'c' }
-    } } })
-    const d = await createMyEpitechService(mk(body), async () => 't', now).runDetails('44')
-    expect(d).toEqual([
-      { name: 'a', passed: 3, count: 4, tests: [] },
-      { name: 'b', passed: 1, count: 1, tests: [{ name: 't', passed: true, crashed: false }] },
-      { name: 'c', passed: 0, count: 0, tests: [] }
-    ])
+
+  test('history décodé et trié', async () => {
+    const runs = await setup().svc.history(2026, 'G-CPE-101', 'myprintf')
+    expect(runs.map((r) => r.id)).toEqual(['9000'])
   })
-  test('les résultats exposent le slug', async () => {
-    expect((await createMyEpitechService(mk(me), async () => 't', now).refresh()).results[0].slug).toBe('cpoolday01')
+
+  test('format inattendu → erreur claire', async () => {
+    const t = routes()
+    t['/students/test-results/1'] = ok('<html>maintenance</html>')
+    t['/students/test-results/2'] = ok('{"skills": 3}')
+    const { svc } = setup(t)
+    await expect(svc.runDetail('1')).rejects.toThrow('Format My Epitech inattendu')
+    await expect(svc.runDetail('2')).rejects.toThrow('Format My Epitech inattendu')
   })
 })

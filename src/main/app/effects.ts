@@ -1,6 +1,7 @@
 import { projectKey } from '../../shared/projects'
-import type { Commit, Deadline, DeadlineView, Repo, ServiceDataMap, ServiceId, Settings } from '../../shared/types'
+import type { Commit, Deadline, DeadlineView, MyEpitechData, Repo, ServiceDataMap, ServiceId, Settings } from '../../shared/types'
 import { alertKey, buildDeadlineViews } from '../links/deadlineAlerts'
+import { normalize } from '../links/repoMatcher'
 
 const COMMIT_TTL = 5 * 60_000
 const MAX_TEXT = 200
@@ -29,8 +30,15 @@ export function teamsKey(title: string, body: string, tag: string): string {
   return `teams:${tag}|${title}|${body}`
 }
 
+/** Rendus : projets My Epitech inscrits dont la fin est dans le futur. */
+export function deadlinesFrom(data: MyEpitechData | null | undefined, nowMs: number): Deadline[] {
+  return (data?.projects ?? [])
+    .filter((p) => Date.parse(p.end) > nowMs)
+    .map((p) => ({ id: `mye-${p.id}`, moduleCode: p.unitCode, projectCode: normalize(p.name), title: p.name, end: p.end, url: p.url }))
+}
+
 /**
- * Lien manuel par échéance : repo lié sur la page projet (clé intranet, s'il existe encore),
+ * Lien manuel par échéance : repo lié sur la page projet (clé du projet, s'il existe encore),
  * sinon lien posé sur le rendu ; l'association automatique reste le dernier recours.
  */
 export function deadlineRepoLinks(deadlines: Deadline[], repos: Repo[], settings: Pick<Settings, 'repoLinks' | 'projectRepoLinks'>): Record<string, string> {
@@ -69,41 +77,40 @@ export function createEffects(deps: EffectsDeps) {
   }
 
   async function deadlines(data: Data): Promise<DeadlineView[]> {
-    const intra = data.intra
-    if (!intra) return []
+    if (!data.myepitech) return []
+    const list = deadlinesFrom(data.myepitech, deps.now())
     const repos = data.github?.repos ?? []
-    const manual = deadlineRepoLinks(intra.deadlines, repos, deps.settings())
+    const manual = deadlineRepoLinks(list, repos, deps.settings())
     const now = new Date(deps.now())
-    const first = buildDeadlineViews(intra.deadlines, repos, {}, manual, now)
+    const first = buildDeadlineViews(list, repos, {}, manual, now)
     const linked = new Map<string, Repo>()
     for (const v of first) if (v.repo) linked.set(v.repo.fullName, v.repo)
     const fetched: Record<string, Commit | null> = {}
     await Promise.all([...linked.values()].map(async (r) => { fetched[r.fullName] = await commitFor(r) }))
-    return buildDeadlineViews(intra.deadlines, repos, fetched, manual, now)
+    return buildDeadlineViews(list, repos, fetched, manual, now)
   }
 
   return {
     deadlines,
-    /** À appeler après chaque rafraîchissement : alertes de rendu + nouvelles notifications. */
+    /** À appeler après chaque rafraîchissement : alertes de rendu + nouvelles notifications GitHub. */
     async afterRefresh(data: Data): Promise<void> {
       for (const v of await deadlines(data)) {
         const key = alertKey(v)
         if (!key) continue
         const urgent = v.alert === 'urgent'
-        deps.hub.push(key, 'intra', urgent ? 'Rendu urgent' : 'Rendu bientôt dû', `${v.title} — fin ${new Date(v.end).toLocaleString('fr-FR')}`, v.url)
+        deps.hub.push(key, 'myepitech', urgent ? 'Rendu urgent' : 'Rendu bientôt dû', `${v.title} — fin ${new Date(v.end).toLocaleString('fr-FR')}`, v.url)
       }
       const recent = (date: string): boolean => {
         const t = Date.parse(date)
         return Number.isNaN(t) || deps.now() - t <= SEVEN_DAYS
       }
-      const batch = (service: 'github' | 'intra', items: { key: string; date: string; title: string; body: string; url?: string }[]): void => {
+      const batch = (service: 'github', items: { key: string; date: string; title: string; body: string; url?: string }[]): void => {
         const fresh = items.filter((i) => recent(i.date))
         // Première fois que ce service est traité sur ce poste : on amorce sans rafale de notifications.
         if (!deps.hub.isPrimed(service)) deps.hub.prime(fresh.map((i) => i.key), service)
         else for (const i of fresh) deps.hub.push(i.key, service, i.title, i.body, i.url)
       }
       if (data.github) batch('github', data.github.notifications.map((n) => ({ key: `github:${n.id}`, date: n.updatedAt, title: n.title, body: n.repo, url: n.url })))
-      if (data.intra) batch('intra', data.intra.notifications.map((n) => ({ key: `intra:${n.id}`, date: n.date, title: n.title, body: '' })))
     }
   }
 }

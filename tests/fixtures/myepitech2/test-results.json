@@ -1,0 +1,33 @@
+{
+  "results": [
+    {
+      "id": 9000,
+      "context": { "unitCode": "G-CPE-101", "projectCode": "myprintf", "title": "My printf", "year": 2026 },
+      "properties": { "date": "2026-10-18T09:00:00Z", "commit": "1111111", "group": { "members": ["jane.doe@epitech.eu"] } },
+      "failureFlags": [],
+      "prerequisitesMark": 1,
+      "codingStyle": { "penalty": { "Penalty": { "value": 0 } }, "value": { "fatal": 0, "major": 0, "minor": 1, "info": 2 } },
+      "coverage": { "Default": { "linePercentage": 55.5, "branchPercentage": 30 } },
+      "skillBreakdowns": {
+        "01 - base tests": { "count": 4, "passed": 3, "crashed": 0, "mandatoryFailed": 0 },
+        "02 - flags": { "count": 2, "passed": 1, "crashed": 0, "mandatoryFailed": 0 }
+      },
+      "repoLink": "https://github.com/octocat/G-CPE-101-myprintf",
+      "achievementSummary": { "passed": 1, "total": 2 }
+    },
+    {
+      "id": 9001,
+      "context": { "unitCode": "G-CPE-101", "projectCode": "myprintf", "title": "My printf", "year": 2026 },
+      "properties": { "date": "2026-10-20T10:00:00Z", "commit": "2222222", "group": { "members": ["jane.doe@epitech.eu", "octocat@epitech.eu"] } },
+      "failureFlags": ["no-test-passed"],
+      "prerequisitesMark": 1,
+      "codingStyle": { "penalty": { "Penalty": { "value": 2 } }, "value": { "fatal": 0, "major": 1, "minor": 3, "info": 0 } },
+      "coverage": { "Default": { "linePercentage": 40, "branchPercentage": 25 } },
+      "skillBreakdowns": {
+        "01 - base tests": { "count": 4, "passed": 0, "crashed": 1, "mandatoryFailed": 1 }
+      },
+      "repoLink": "https://github.com/octocat/G-CPE-101-myprintf",
+      "achievementSummary": { "passed": 0, "total": 2 }
+    }
+  ]
+}

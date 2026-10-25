@@ -1,4 +1,0 @@
-{"results":{"testRunId":42,"skills":[
-  {"FullSkillReport":{"name":"basics","tests":[{"name":"prints hello","passed":true,"crashed":false},{"name":"prints newline","passed":false,"crashed":false}]}},
-  {"FullSkillReport":{"name":"edge cases","tests":[{"name":"empty input","passed":false,"crashed":true},{"name":"long input","passed":false,"crashed":false}]}}
-]}}

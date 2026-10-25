@@ -1,0 +1,10 @@
+{
+  "login": "jane.doe@epitech.eu",
+  "firstname": "Jane",
+  "lastname": "Doe",
+  "promotion": 2030,
+  "semester": 1,
+  "gpa": null,
+  "cursus": { "code": "PGE", "name": "Programme Grande École" },
+  "campus": { "name": "Lyon" }
+}

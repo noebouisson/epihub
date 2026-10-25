@@ -1,0 +1,30 @@
+{
+  "context": { "unitCode": "G-CPE-101", "projectCode": "myprintf", "title": "My printf", "year": 2026 },
+  "properties": { "date": "2026-10-20T10:00:00Z", "commit": "2222222", "group": { "members": ["jane.doe@epitech.eu"] } },
+  "failureFlags": ["no-test-passed"],
+  "codingStyle": { "Counts": {} },
+  "coverage": { "Default": { "coveredLines": 20, "totalLines": 50, "coveredBranches": 1, "totalBranches": 4 } },
+  "deliveryError": null,
+  "makeError": null,
+  "bannedFunctions": null,
+  "skills": [
+    {
+      "FullSkillReport": {
+        "name": "01 - base tests",
+        "tests": [
+          { "name": "simple string", "passed": false, "crashed": true, "skipped": false, "mandatory": true, "comment": "Segmentation fault" },
+          { "name": "empty string", "passed": false, "crashed": false, "skipped": false, "mandatory": false, "comment": "Expected '' but got '(null)'" }
+        ]
+      }
+    },
+    {
+      "FullSkillReport": {
+        "name": "02 - flags",
+        "tests": [
+          { "name": "%d", "passed": true, "crashed": false, "skipped": false, "mandatory": false, "comment": "" }
+        ]
+      }
+    }
+  ],
+  "achievements": [{ "title": "First steps", "testCategoryName": "01 - base tests", "unlocked": false }]
+}

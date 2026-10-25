@@ -4,7 +4,7 @@ import { NeedsLoginError, NotReadyError, type Service } from '../../src/main/ser
 import type { ServiceDataMap, ServiceId } from '../../src/shared/types'
 
 const ghEmpty = { login: '', notifications: [], reviewRequests: [], assignedIssues: [], repos: [] }
-const intraEmpty = { login: '', promo: 0, credits: 0, gpa: '', deadlines: [], events: [], notifications: [] }
+const myeEmpty = { profile: { login: '', name: '', promotion: null, semester: null, gpa: null, cursus: null }, projects: [], runs: {} }
 
 function ok<K extends ServiceId>(id: K, data: ServiceDataMap[K]): Service<K> {
   return { id, refresh: async () => data }
@@ -18,8 +18,8 @@ function toggling(data: ServiceDataMap['teams']) {
 }
 const all = () => ({
   github: ok('github', ghEmpty),
-  intra: ok('intra', intraEmpty),
-  myepitech: ok('myepitech', { results: [] }),
+  intra: ok('intra', null),
+  myepitech: ok('myepitech', myeEmpty),
   teams: ok('teams', { unread: 0 })
 })
 

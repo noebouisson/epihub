@@ -1,21 +1,22 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { app, BrowserWindow, clipboard, Notification, safeStorage, session } from 'electron';
+import { app, BrowserWindow, clipboard, net, Notification, safeStorage, session } from 'electron';
 import type { ServiceId } from '../shared/types';
 import { debounce } from './app/debounce';
 import { createEffects } from './app/effects';
+import { myepitechSessionDeps } from './app/myepitechSession';
 import { createProjectDetails } from './app/projectDetails';
 import { createProjectsApi } from './app/projectsApi';
 import { revealWindow } from './app/window';
 import { registerIpc } from './ipc';
-import { readMyEpitechToken } from './myepitechToken';
 import { installNavigationSecurity } from './security';
 import { configureServiceSessions } from './sessions';
 import { createNotificationHub, type HubNotification } from './notify/notificationHub';
 import { createGithubService } from './services/github';
 import { createIntraService } from './services/intra';
 import { createMyEpitechService } from './services/myepitech';
+import { createMyEpitechAuth } from './services/myepitechAuth';
 import { createRegistry } from './services/registry';
 import { createTeamsService } from './services/teams';
 import type { FetchLike } from './services/types';
@@ -94,12 +95,11 @@ function start(): void {
 
   const github = createGithubService(partitionFetch('github'), () => secrets.getGithubToken());
   const teams = createTeamsService();
-  const services = {
-    github,
-    intra: createIntraService(partitionFetch('intra')),
-    myepitech: createMyEpitechService(partitionFetch('myepitech'), readMyEpitechToken),
-    teams
-  };
+  const myepitechAuth = createMyEpitechAuth({ ...myepitechSessionDeps(), now: Date.now });
+  // API appelée hors de la partition persist:myepitech (seul le jeton Bearer compte) :
+  // nos propres requêtes ne repassent donc jamais par l'écouteur qui capture le jeton.
+  const myepitech = createMyEpitechService({ fetch: (url, init) => net.fetch(url, init), auth: myepitechAuth, now: Date.now });
+  const services = { github, intra: createIntraService(), myepitech, teams };
 
   const effects = createEffects({ lastCommit: (f, b) => github.lastCommit(f, b), settings: () => settings.get(), hub, now: Date.now });
 
@@ -107,7 +107,7 @@ function start(): void {
     snapshot: () => registry.snapshot(),
     deadlines: (data) => effects.deadlines(data),
     settings: () => settings.get(),
-    details: createProjectDetails({ intra: services.intra, github, myepitech: services.myepitech, now: Date.now }),
+    details: createProjectDetails({ github, myepitech: { data: () => registry.snapshot().myepitech.data, runDetail: (id) => myepitech.runDetail(id) }, now: Date.now }),
     now: Date.now
   });
 

@@ -1,4 +1,0 @@
-[
-  {"id":"r-old","date":"2026-10-20T10:00:00.000Z","project":{"name":"Day 00","slug":"cpoolday00","module":{"code":"G-CPE-100"}},"results":{"testRunId":1001,"skills":{"a":{"count":4,"passed":1}}}},
-  {"id":"r-new","date":"2026-10-24T10:00:00.000Z","project":{"name":"Day 01","slug":"cpoolday01","module":{"code":"G-CPE-100"}},"results":{"testRunId":1002,"skills":{"a":{"count":2,"passed":2},"b":{"count":2,"passed":1}}}}
-]

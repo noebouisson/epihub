@@ -29,5 +29,5 @@ export function buildDeadlineViews(
 }
 
 export function alertKey(v: DeadlineView): string | null {
-  return v.alert ? `intra:deadline:${v.id}:${v.alert}` : null
+  return v.alert ? `myepitech:deadline:${v.id}:${v.alert}` : null
 }
