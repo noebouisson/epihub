@@ -28,3 +28,4 @@ test('le Markdown contient les sections', () => {
   const md = renderMarkdown(full)
   for (const h of ['## Résumé', '## Pourquoi', '## Comment s’améliorer', '## Évolution', '## Ce qui marche']) expect(md).toContain(h)
 })
+test('reportPath : codes vides après nettoyage → repli', () => expect(reportPath(rep({ unitCode: '///', projectCode: '-x-' })).dir).toBe('projet-x'))

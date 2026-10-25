@@ -13,14 +13,14 @@ function fence(comment: string): string {
 
 const pad = (n: number) => String(n).padStart(2, '0')
 
-function sanitize(s: string): string { return s.replace(/[^A-Za-z0-9_-]/g, '') }
+function sanitize(s: string): string { return s.replace(/[^A-Za-z0-9_-]/g, '').replace(/^-+|-+$/g, '') }
 
 export function reportPath(r: Report): { dir: string; file: string } {
   const d = new Date(r.date)
   const stamp = Number.isNaN(d.getTime())
     ? '0000-00-00_00-00'
     : `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}`
-  return { dir: `${sanitize(r.unitCode)}-${sanitize(r.projectCode)}`, file: `${stamp}-${sanitize(r.runId)}.md` }
+  return { dir: `${sanitize(r.unitCode) || 'projet'}-${sanitize(r.projectCode) || 'projet'}`, file: `${stamp}-${sanitize(r.runId)}.md` }
 }
 
 export function renderMarkdown(r: Report): string {

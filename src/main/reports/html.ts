@@ -17,7 +17,10 @@ export function renderHtml(r: Report): string {
   parts.push(`<h2>Résumé</h2><p>${e(r.summary)}</p>`)
   if (r.blockers.length > 0) parts.push(`<h2>Blocages</h2>${list(r.blockers)}`)
   if (r.categories.length > 0) {
-    parts.push(`<h2>Catégories</h2>${list(r.categories.map((c) => `${c.name} : ${c.passed}/${c.count}`))}`)
+    parts.push(`<h2>Catégories</h2>${list(r.categories.map((c) => {
+      const extra = [c.crashed ? `${c.crashed} crash` : '', c.mandatoryFailed ? `${c.mandatoryFailed} obligatoire(s) en échec` : ''].filter(Boolean)
+      return `${c.name} : ${c.passed}/${c.count}${extra.length ? ` (${extra.join(', ')})` : ''}`
+    }))}`)
   }
   if (r.failedTests.length > 0) {
     parts.push('<h2>Tests échoués</h2>')
@@ -27,6 +30,9 @@ export function renderHtml(r: Report): string {
       if (t.comment) parts.push(`<pre>${e(t.comment)}</pre>`)
     }
   }
+  const st = r.style
+  if (st.fatal + st.major + st.minor + st.info > 0) parts.push(`<p>Coding style : ${st.fatal} fatal, ${st.major} major, ${st.minor} minor, ${st.info} info</p>`)
+  if (r.coverage.lines !== null || r.coverage.branches !== null) parts.push(`<p>Couverture : lignes ${r.coverage.lines ?? '?'} %, branches ${r.coverage.branches ?? '?'} %</p>`)
   if (r.advice.length > 0) {
     parts.push('<h2>Comment s’améliorer</h2>')
     for (const a of r.advice) {

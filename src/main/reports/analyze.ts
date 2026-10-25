@@ -1,26 +1,29 @@
-import { scoreOf, verdictOf } from '../../shared/score'
+import { allPassed, scoreOf, verdictOf } from '../../shared/score'
 import type { Report, ReportAdvice, RunDetail, RunSummary } from '../../shared/types'
 
 const NO_TEST_PASSED = 'Aucun test ne passe : le binaire ne compile pas, ne s’appelle pas comme attendu ou ne produit aucune sortie'
 
-function blockersOf(summary: RunSummary, detail: RunDetail): string[] {
-  const out: string[] = []
-  if (detail.deliveryError) out.push(`Erreur de livraison : ${detail.deliveryError}`)
-  if (detail.makeError) out.push(`Erreur de compilation : ${detail.makeError}`)
-  if (detail.bannedFunctions.length > 0) out.push(`Fonctions interdites : ${detail.bannedFunctions.join(', ')}`)
-  for (const f of summary.failureFlags) out.push(f === 'no-test-passed' ? NO_TEST_PASSED : `Indicateur moulinette : ${f}`)
+interface Blocker { text: string; advice: ReportAdvice }
+const p1 = (title: string, text: string): ReportAdvice => ({ priority: 1, title, text, tests: [] })
+
+function blockersOf(summary: RunSummary, detail: RunDetail): Blocker[] {
+  const out: Blocker[] = []
+  if (detail.deliveryError) out.push({ text: `Erreur de livraison : ${detail.deliveryError}`, advice: p1('Erreur de livraison', 'Vérifie que les fichiers attendus sont à la racine du dépôt, que le binaire porte exactement le nom du sujet et que rien d’interdit n’est poussé (binaires, .o).') })
+  if (detail.makeError) out.push({ text: `Erreur de compilation : ${detail.makeError}`, advice: p1('Erreur de compilation', 'Lance `make re` sur une copie propre du dépôt (git clone) : le Makefile doit compiler sans erreur avec les flags du sujet.') })
+  if (detail.bannedFunctions.length > 0) out.push({ text: `Fonctions interdites : ${detail.bannedFunctions.join(', ')}`, advice: p1('Fonctions interdites', 'Remplace les fonctions listées par tes propres implémentations ou par les fonctions autorisées du sujet.') })
+  for (const f of summary.failureFlags) {
+    if (f === 'no-test-passed') out.push({ text: NO_TEST_PASSED, advice: p1('Aucun test ne passe', 'Vérifie que le projet compile, que le binaire a le bon nom et qu’il produit une sortie sur un cas simple.') })
+    else out.push({ text: `Indicateur moulinette : ${f}`, advice: p1('Indicateur moulinette', 'Consulte le détail du passage sur My Epitech pour cet indicateur.') })
+  }
   return out
 }
 
 function adviceFor(
-  blockers: string[], failed: Report['failedTests'], categories: Report['categories'],
+  blockerAdvice: ReportAdvice[], failed: Report['failedTests'], categories: Report['categories'],
   style: Report['style'], coverage: Report['coverage']
 ): ReportAdvice[] {
   const advice: ReportAdvice[] = []
-  for (const b of blockers) {
-    const i = b.indexOf(' : ')
-    advice.push({ priority: 1, title: i < 0 ? b : b.slice(0, i), text: b, tests: [] })
-  }
+  advice.push(...blockerAdvice)
   const mandatory = failed.filter((t) => t.mandatory)
   if (mandatory.length > 0) {
     advice.push({ priority: 1, title: 'Tests obligatoires', text: 'Ces tests sont obligatoires : tant qu’ils échouent, le projet ne peut pas être validé. Corrige-les avant tout le reste.', tests: mandatory.map((t) => t.name) })
@@ -52,7 +55,7 @@ function evolutionOf(summary: RunSummary, detail: RunDetail, previous: { summary
   if (previous.detail) {
     const state = (d: RunDetail) => {
       const m = new Map<string, boolean>()
-      for (const c of d.categories) for (const t of c.tests) if (!t.skipped) m.set(t.name, t.passed)
+      for (const c of d.categories) for (const t of c.tests) if (!t.skipped) m.set(`${c.name}/${t.name}`, t.passed)
       return m
     }
     const before = state(previous.detail)
@@ -62,8 +65,9 @@ function evolutionOf(summary: RunSummary, detail: RunDetail, previous: { summary
     for (const [name, passed] of now) {
       const was = before.get(name)
       if (was === undefined) continue
-      if (!was && passed) fixed.push(name)
-      if (was && !passed) broken.push(name)
+      const label = name.slice(name.indexOf('/') + 1)
+      if (!was && passed) fixed.push(label)
+      if (was && !passed) broken.push(label)
     }
     return { fixed, broken, byCategory: false }
   }
@@ -79,7 +83,8 @@ function evolutionOf(summary: RunSummary, detail: RunDetail, previous: { summary
 
 export function buildReport(summary: RunSummary, detail: RunDetail, previous?: { summary: RunSummary; detail: RunDetail | null }): Report {
   const score = scoreOf(summary.categories)
-  const blockers = blockersOf(summary, detail)
+  const blockerList = blockersOf(summary, detail)
+  const blockers = blockerList.map((b) => b.text)
   const categories = Object.entries(summary.categories)
     .map(([name, c]) => ({ name, passed: c.passed, count: c.count, crashed: c.crashed, mandatoryFailed: c.mandatoryFailed }))
     .sort((a, b) => a.name.localeCompare(b.name))
@@ -94,13 +99,13 @@ export function buildReport(summary: RunSummary, detail: RunDetail, previous?: {
   const failedTests = [...failed.filter(urgent), ...failed.filter((t) => !urgent(t))]
 
   const coverage = { lines: detail.coverage.lines ?? summary.coverage.lines, branches: detail.coverage.branches ?? summary.coverage.branches }
-  const advice = adviceFor(blockers, failedTests, categories, summary.style, coverage)
+  const advice = adviceFor(blockerList.map((b) => b.advice), failedTests, categories, summary.style, coverage)
 
   const total = categories.reduce((n, c) => n + c.count, 0)
   const passed = categories.reduce((n, c) => n + c.passed, 0)
   let text = `${passed} tests sur ${total} passent.`
   const firstP1 = advice.find((a) => a.priority === 1)
-  if (score === 100) text += ' Tous les tests passent.'
+  if (allPassed(summary.categories)) text += ' Tous les tests passent.'
   else if (firstP1) text += ` Priorité : ${firstP1.title}.`
 
   const prevScore = previous ? scoreOf(previous.summary.categories) : null

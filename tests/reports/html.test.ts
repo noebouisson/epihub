@@ -14,3 +14,13 @@ test('titre échappé, guillemets compris', () => {
 })
 test('document complet', () => expect(renderHtml(full)).toMatch(/^<!doctype html>/i))
 test('aucun script', () => expect(renderHtml(full)).not.toContain('<script'))
+test('style, couverture et compteurs par catégorie', () => {
+  const h = renderHtml(rep({
+    style: { fatal: 1, major: 2, minor: 0, info: 0, penalty: null }, coverage: { lines: 30, branches: null },
+    categories: [{ name: 'a', passed: 1, count: 3, crashed: 2, mandatoryFailed: 1 }]
+  }))
+  expect(h).toContain('1 fatal, 2 major')
+  expect(h).toContain('lignes 30 %')
+  expect(h).toContain('2 crash')
+  expect(h).toContain('1 obligatoire(s) en échec')
+})

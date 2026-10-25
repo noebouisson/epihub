@@ -94,3 +94,22 @@ test('zéro test : score null, verdict échoué', () => {
   expect(r.score).toBeNull()
   expect(r.verdict).toBe('echoue')
 })
+
+test('995/1000 : arrondi à 100 mais partiel, sans « Tous les tests passent »', () => {
+  const s = sum({ categories: { a: cat(1000, 995) } })
+  expect(verdictOf(s, det())).toBe('partiel')
+  expect(buildReport(s, det()).summary).not.toContain('Tous les tests passent')
+})
+test('conseils de blocage actionnables, sans répéter l’erreur brute', () => {
+  const r = buildReport(sum(), det({ makeError: 'make: *** Error 1' }))
+  expect(r.blockers[0]).toContain('make: *** Error 1')
+  const a = r.advice.find((x) => x.title === 'Erreur de compilation')!
+  expect(a.text).toContain('make re')
+  expect(a.text).not.toContain('Error 1')
+})
+test('évolution par test : deux catégories avec le même nom de test', () => {
+  const t = (name: string, passed: boolean) => test_(name, { passed })
+  const prev = { summary: sum(), detail: det({ categories: [{ name: 'x', tests: [t('a', false)] }, { name: 'y', tests: [t('a', true)] }] }) }
+  const r = buildReport(sum(), det({ categories: [{ name: 'x', tests: [t('a', true)] }, { name: 'y', tests: [t('a', true)] }] }), prev)
+  expect(r.evolution).toEqual({ fixed: ['a'], broken: [], byCategory: false })
+})
