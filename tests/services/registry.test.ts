@@ -96,4 +96,17 @@ describe('registre des services', () => {
     await reg.refresh('teams')
     expect(reg.snapshot().teams.status).toEqual({ state: 'error', message: 'down', updatedAt: 5 })
   })
+
+  test('options de rafraîchissement : service demandé, ou My Epitech seul pour « tout »', async () => {
+    const mye = { id: 'myepitech' as const, refresh: vi.fn(async (_o?: { force?: boolean }) => myeEmpty) }
+    const gh = { id: 'github' as const, refresh: vi.fn(async (_o?: { force?: boolean }) => ghEmpty) }
+    const reg = createRegistry({ ...all(), myepitech: mye, github: gh }, { now: () => 1, onChange: vi.fn() })
+    await reg.refresh('myepitech', { force: true })
+    expect(mye.refresh).toHaveBeenLastCalledWith({ force: true })
+    await reg.refresh()
+    expect(mye.refresh).toHaveBeenLastCalledWith(undefined)
+    await reg.refresh(undefined, { force: true })
+    expect(mye.refresh).toHaveBeenLastCalledWith({ force: true })
+    expect(gh.refresh).toHaveBeenLastCalledWith(undefined)
+  })
 })

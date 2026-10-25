@@ -7,6 +7,7 @@ import { projectKey } from '../shared/projects';
 import type { ServiceId } from '../shared/types';
 import { debounce } from './app/debounce';
 import { createEffects } from './app/effects';
+import { destroyHiddenWindows } from './app/hiddenWindows';
 import { myepitechSessionDeps } from './app/myepitechSession';
 import { createProjectDetails } from './app/projectDetails';
 import { createProjectsApi } from './app/projectsApi';
@@ -52,6 +53,8 @@ function createWindow(): void {
   mainWindow = win;
   win.on('closed', () => {
     if (mainWindow === win) mainWindow = null;
+    // Une fenêtre cachée encore ouverte empêcherait « window-all-closed » : l'application quitte tout de suite.
+    destroyHiddenWindows();
   });
   if (process.env['ELECTRON_RENDERER_URL']) {
     void win.loadURL(process.env['ELECTRON_RENDERER_URL']);
@@ -193,7 +196,10 @@ if (!app.requestSingleInstanceLock()) {
     });
   });
 
+  // Les fenêtres cachées (jeton, PDF) ne doivent ni retarder la sortie ni garder l'application ouverte.
+  app.on('before-quit', () => destroyHiddenWindows());
   app.on('window-all-closed', () => {
+    destroyHiddenWindows();
     if (process.platform !== 'darwin') app.quit();
   });
 }

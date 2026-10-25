@@ -8,6 +8,7 @@ import { DeadlineRow } from '../components/DeadlineRow';
 import { RepoPicker } from '../components/RepoPicker';
 import { ShareButton } from '../components/ShareButton';
 import type { View } from '../services';
+import { userRefreshArgs } from '../refresh';
 
 interface Props {
   snapshot: Snapshot | null;
@@ -32,11 +33,11 @@ export function Home({ snapshot, settings, onSettings, open, openProject, setVie
     };
   }, [snapshot, settings?.repoLinks]);
 
-  const refresh = (id?: ServiceId): void => void window.epihub.refresh(id).catch(() => undefined);
+  const refresh = (id?: ServiceId): void => void window.epihub.refresh(...userRefreshArgs(id)).catch(() => undefined);
   const refreshAll = async (): Promise<void> => {
     setRefreshing(true);
     try {
-      await window.epihub.refresh();
+      await window.epihub.refresh(...userRefreshArgs());
     } catch {
       /* l'état de chaque service s'affiche dans sa carte */
     } finally {

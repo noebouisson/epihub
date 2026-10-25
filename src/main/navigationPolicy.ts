@@ -47,10 +47,13 @@ export function popupPolicy(url: string): 'popup' | 'same-view' | 'external' {
 /**
  * Navigation (will-navigate / will-redirect) d'un invité : les sous-cadres (iframes) sont laissés
  * passer sans bruit ; seul le cadre principal est limité aux domaines des services.
+ * `hidden` : fenêtre invisible d'EpiHub → hors liste bloqué en silence ('block').
  */
-export function guestNavigation(url: string, isMainFrame: boolean): 'allow' | 'external' {
+export function guestNavigation(url: string, isMainFrame: boolean, hidden = false): 'allow' | 'external' | 'block' {
   if (!isMainFrame) return 'allow';
-  return isAllowedUrl(url) ? 'allow' : 'external';
+  if (isAllowedUrl(url)) return 'allow';
+  // Fenêtre cachée (renouvellement du jeton) : rien ne doit s'ouvrir dans le navigateur de l'utilisateur.
+  return hidden ? 'block' : 'external';
 }
 
 export function isPaletteShortcut(input: { type: string; control?: boolean; meta?: boolean; key: string }): boolean {

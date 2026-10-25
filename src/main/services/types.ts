@@ -22,7 +22,12 @@ export class NotReadyError extends Error {
   }
 }
 
+/** `force` : action explicite de l'utilisateur (seul My Epitech l'utilise, pour ignorer la pause de reconnexion). */
+export interface RefreshOptions {
+  force?: boolean
+}
+
 export interface Service<K extends ServiceId> {
   id: K
-  refresh(): Promise<ServiceDataMap[K]>
+  refresh(opts?: RefreshOptions): Promise<ServiceDataMap[K]>
 }

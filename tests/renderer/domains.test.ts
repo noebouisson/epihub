@@ -3,7 +3,7 @@ import { isAllowedUrl, isServiceHomeOrigin, isServiceOwnOrigin, SERVICE_HOMES, s
 
 describe('isAllowedUrl', () => {
   test.each(['https://github.com/x', 'https://gist.github.com/', 'https://intra.epitech.eu/', 'https://login.microsoftonline.com/a', 'https://teams.microsoft.com/v2/', 'https://teams.cloud.microsoft/', 'https://x.cloud.microsoft/a'])('autorise %s', (u) => expect(isAllowedUrl(u)).toBe(true));
-  test.each(['https://evil.com/', 'https://github.com.evil.com/', 'http://github.com/', 'https://notgithub.com/', 'https://evilcloud.microsoft.com.evil/', 'https://notcloud.microsoft.evil/', 'javascript:alert(1)', 'nope'])('refuse %s', (u) => expect(isAllowedUrl(u)).toBe(false));
+  test.each(['https://evil.com/', 'https://github.com.evil.com/', 'http://github.com/', 'https://notgithub.com/', 'https://evilcloud.microsoft.com.evil/', 'https://notcloud.microsoft.evil/', 'javascript:alert(1)', 'nope', 'https://epitest.eu/', 'https://api.epitest.eu/x'])('refuse %s', (u) => expect(isAllowedUrl(u)).toBe(false));
 });
 test('origines d’accueil', () => {
   expect(isServiceHomeOrigin('https://github.com/')).toBe(true);

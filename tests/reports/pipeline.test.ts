@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { createReportPipeline, isInsideDir, pdfPathFor } from '../../src/main/reports/pipeline'
 import { createReportStore } from '../../src/main/reports/store'
+import { NeedsLoginError } from '../../src/main/services/types'
 import { projectKey } from '../../src/shared/projects'
 import type { MyEpitechData, MyProject } from '../../src/shared/types'
 import { cat, det, rep, sum, test_ } from './helpers'
@@ -99,6 +100,22 @@ test('premier process sans aucun passage : reste non initialisé', async () => {
   const { pipe, store } = setup(true)
   await pipe.process({ ...data, runs: {} })
   expect(store.isInitialized()).toBe(false)
+})
+
+test('reconnexion requise : arrêt du lot, projets restants intacts et jamais marqués silencieux', async () => {
+  const { pipe, runDetail, store, notify } = setup(true)
+  runDetail.mockRejectedValue(new NeedsLoginError())
+  await pipe.process(two())
+  expect(runDetail).toHaveBeenCalledTimes(1)
+  expect(store.has('9001')).toBe(false)
+  expect(store.has('9100')).toBe(false)
+  expect(store.isSilent('9001')).toBe(false)
+  expect(store.isSilent('9100')).toBe(false)
+  expect(store.isInitialized()).toBe(false)
+  runDetail.mockImplementation(async () => det())
+  await pipe.process(two())
+  expect(store.has('9001') && store.has('9100')).toBe(true)
+  expect(notify).not.toHaveBeenCalled()
 })
 
 test('une erreur sur un projet n’arrête pas les autres', async () => {

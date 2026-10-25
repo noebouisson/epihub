@@ -1,5 +1,6 @@
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type { MyEpitechData, MyProject, Report, ReportEntry, RunDetail } from '../../shared/types'
+import { NeedsLoginError } from '../services/types'
 import { buildReport } from './analyze'
 import { renderMarkdown, reportPath } from './markdown'
 import type { ReportStore } from './store'
@@ -75,6 +76,7 @@ export function createReportPipeline(deps: PipelineDeps) {
   async function run(data: MyEpitechData): Promise<void> {
     const wasInitialized = deps.store.isInitialized()
     let sawRuns = false
+    let needsLogin = false
     for (const p of data.projects) {
       const runs = data.runs[p.id]
       if (!runs || runs.length === 0) continue
@@ -85,6 +87,11 @@ export function createReportPipeline(deps: PipelineDeps) {
         if (!existing) await generate(p, key, runs, wasInitialized && !deps.store.isSilent(runs[0].id))
         else if (existing.file === null) await retryWrite(existing)
       } catch (err) {
+        // Déconnecté : on arrête le lot ; les projets restants seront traités (sans pause silencieuse) au prochain passage.
+        if (err instanceof NeedsLoginError) {
+          needsLogin = true
+          break
+        }
         // Échec pendant le lot initial : ce passage ne sera jamais notifié, même généré plus tard.
         if (!wasInitialized) {
           try { deps.store.markSilent(runs[0].id) } catch { /* index illisible : déjà journalisé ci-dessous */ }
@@ -92,7 +99,8 @@ export function createReportPipeline(deps: PipelineDeps) {
         console.error('[epihub] rapport:', errMsg(err))
       }
     }
-    if (!wasInitialized && sawRuns) deps.store.markInitialized()
+    // Lot initial interrompu par la déconnexion : il reprendra (toujours sans notification) au prochain passage.
+    if (!wasInitialized && sawRuns && !needsLogin) deps.store.markInitialized()
   }
 
   let lock: Promise<void> = Promise.resolve()

@@ -7,14 +7,14 @@ import { buildSearchItems, search } from './links/searchIndex'
 import { shareText } from './links/shareText'
 import { isInsideDir, pdfPathFor } from './reports/pipeline'
 import { validRunId, type ReportStore } from './reports/store'
+import { refreshArgs } from './ipcArgs'
 import { isTrustedSender } from './securityPolicy'
+import type { RefreshOptions } from './services/types'
 import { sanitizeSettingsPatch } from './store/settings'
 
-const SERVICE_IDS: readonly ServiceId[] = ['github', 'intra', 'myepitech', 'teams']
-const isServiceId = (v: unknown): v is ServiceId => SERVICE_IDS.includes(v as ServiceId)
 
 export interface IpcDeps {
-  registry: { refresh(id?: ServiceId): Promise<void>; snapshot(): Record<ServiceId, { data: unknown }> }
+  registry: { refresh(id?: ServiceId, opts?: RefreshOptions): Promise<void>; snapshot(): Record<ServiceId, { data: unknown }> }
   effects: { deadlines(data: Record<string, unknown>): Promise<unknown> }
   projects: { invalidate(): void; list(): Promise<ProjectSummary[]>; detail(key: unknown, force: unknown): Promise<ProjectDetail | null> }
   settings: { get(): Settings; update(patch: Partial<Settings>): Settings }
@@ -52,7 +52,10 @@ export function registerIpc(deps: IpcDeps): void {
   }
 
   handle('epihub:snapshot', () => deps.registry.snapshot())
-  handle('epihub:refresh', (_e, id?: unknown) => deps.registry.refresh(isServiceId(id) ? id : undefined))
+  handle('epihub:refresh', (_e, id?: unknown, opts?: unknown) => {
+    const a = refreshArgs(id, opts)
+    return deps.registry.refresh(a.id, a.opts)
+  })
   handle('epihub:deadlines', () => deps.effects.deadlines(dataOf(deps)))
   handle('epihub:projects', () => deps.projects.list())
   handle('epihub:project', (_e, key: unknown, force: unknown) => deps.projects.detail(key, force))

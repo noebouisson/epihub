@@ -1,5 +1,6 @@
 import { app, shell, type BrowserWindow, type WebContents } from 'electron';
 import { isServiceHomeOrigin } from '../shared/domains';
+import { isHiddenContents } from './app/hiddenWindows';
 import { classifyPreload, guestNavigation, isPaletteShortcut, popupPolicy } from './navigationPolicy';
 import { SERVICE_PARTITIONS } from './securityPolicy';
 
@@ -29,10 +30,10 @@ export function installNavigationSecurity(teamsPreloadPath: string, getMainWindo
     const guard = (event: NavEvent, url: string, _inPlace?: boolean, isMainFrameArg?: boolean): void => {
       if (isMain(contents)) return;
       const mainFrame = event.isMainFrame ?? isMainFrameArg ?? true;
-      if (guestNavigation(url, mainFrame) === 'external') {
-        event.preventDefault();
-        openExternal(url);
-      }
+      const decision = guestNavigation(url, mainFrame, isHiddenContents(contents.id));
+      if (decision === 'allow') return;
+      event.preventDefault();
+      if (decision === 'external') openExternal(url);
     };
     contents.on('will-navigate', (event, url, inPlace, isMainFrameArg) => {
       if (isMain(contents)) {

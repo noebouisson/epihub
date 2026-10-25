@@ -26,6 +26,10 @@ describe('navigation des invités', () => {
   test('cadre principal hors liste → externe', () => expect(guestNavigation('https://evil.com/', true)).toBe('external'));
   test('cadre principal autorisé', () => expect(guestNavigation('https://teams.cloud.microsoft/', true)).toBe('allow'));
   test('sous-cadre : toujours laissé passer', () => expect(guestNavigation('https://evil.com/', false)).toBe('allow'));
+  test('fenêtre cachée : hors liste bloqué sans navigateur externe', () => {
+    expect(guestNavigation('https://evil.com/', true, true)).toBe('block');
+    expect(guestNavigation('https://my.epitech.eu/', true, true)).toBe('allow');
+  });
 });
 test('raccourci palette', () => {
   expect(isPaletteShortcut({ type: 'keyDown', control: true, key: 'k' })).toBe(true);

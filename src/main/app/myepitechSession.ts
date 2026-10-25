@@ -1,6 +1,7 @@
 import { BrowserWindow, session } from 'electron';
 import { MYEPITECH_HOME } from '../services/myepitech';
 import type { MyEpitechAuthDeps } from '../services/myepitechAuth';
+import { trackHiddenWindow } from './hiddenWindows';
 
 const PARTITION = 'persist:myepitech';
 
@@ -25,6 +26,8 @@ export function myepitechSessionDeps(): Pick<MyEpitechAuthDeps, 'onRequestHeader
         show: false,
         webPreferences: { partition: PARTITION, sandbox: true, contextIsolation: true, nodeIntegration: false }
       });
+      // Avant tout chargement : le garde-fou bloque alors en silence toute sortie de la liste blanche.
+      trackHiddenWindow(win);
       // Remplace le gestionnaire générique : aucune popup depuis la fenêtre invisible.
       win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
       // Les redirections MSAL peuvent faire échouer loadURL (ERR_ABORTED) sans empêcher la capture du jeton.

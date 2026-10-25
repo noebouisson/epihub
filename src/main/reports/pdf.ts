@@ -1,6 +1,7 @@
 import { writeFile } from 'node:fs/promises'
 import { BrowserWindow } from 'electron'
 import type { Report } from '../../shared/types'
+import { trackHiddenWindow } from '../app/hiddenWindows'
 import { renderHtml } from './html'
 
 /** Rend le rapport en PDF dans une fenêtre cachée, sans script ni accès réseau pilotable. */
@@ -9,6 +10,7 @@ export async function exportPdf(report: Report, outFile: string): Promise<void> 
     show: false,
     webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, javascript: false }
   })
+  trackHiddenWindow(win)
   try {
     win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
     win.webContents.on('will-navigate', (e) => e.preventDefault())

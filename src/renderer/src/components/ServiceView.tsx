@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { isAllowedUrl, isServiceHomeOrigin, shouldRefreshAfterLogin } from '../../../shared/domains';
 import type { ServiceId, ServiceState, TeamsNotificationPayload } from '../../../shared/types';
 import { SERVICES } from '../services';
+import { userRefreshArgs } from '../refresh';
 
 export interface OpenRequest {
   url: string;
@@ -62,7 +63,7 @@ export function ServiceView({ service, visible, request, state }: Props): JSX.El
       if (!shouldRefreshAfterLogin(service, url, stateRef.current)) return;
       clearTimeout(loginTimer);
       loginTimer = setTimeout(() => {
-        if (stateRef.current === 'needs-login') void window.epihub.refresh(service);
+        if (stateRef.current === 'needs-login') void window.epihub.refresh(...userRefreshArgs(service)).catch(() => undefined);
       }, LOGIN_REFRESH_DELAY);
     };
     wv.addEventListener('did-navigate', onLoaded);

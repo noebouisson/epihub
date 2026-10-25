@@ -1,5 +1,5 @@
 import type { ServiceId, ServiceSnapshot } from '../../shared/types'
-import { NeedsLoginError, NotReadyError, type Service } from './types'
+import { NeedsLoginError, NotReadyError, type RefreshOptions, type Service } from './types'
 
 type Services = { [K in ServiceId]: Service<K> }
 type Snapshots = { [K in ServiceId]: ServiceSnapshot<K> }
@@ -21,11 +21,11 @@ export function createRegistry(services: Services, opts: RegistryOptions) {
   }
   const state: Snapshots = { github: seed('github'), intra: seed('intra'), myepitech: seed('myepitech'), teams: seed('teams') }
 
-  async function refreshOne(id: ServiceId): Promise<void> {
+  async function refreshOne(id: ServiceId, refreshOpts?: RefreshOptions): Promise<void> {
     const prev = state[id]
     let next: ServiceSnapshot
     try {
-      const data = await (services[id] as Service<ServiceId>).refresh()
+      const data = await (services[id] as Service<ServiceId>).refresh(refreshOpts)
       next = { status: { state: 'ok', updatedAt: opts.now() }, data }
     } catch (e) {
       // `data` garde la dernière valeur connue (avec sa date) ; le message ne contient jamais de secret.
@@ -43,9 +43,10 @@ export function createRegistry(services: Services, opts: RegistryOptions) {
   }
 
   const registry = {
-    async refresh(id?: ServiceId): Promise<void> {
-      if (id) return refreshOne(id)
-      await Promise.allSettled(IDS.map(refreshOne))
+    /** `refreshOpts` (force) : transmis au service demandé ; pour « tout », à My Epitech seulement. */
+    async refresh(id?: ServiceId, refreshOpts?: RefreshOptions): Promise<void> {
+      if (id) return refreshOne(id, refreshOpts)
+      await Promise.allSettled(IDS.map((i) => refreshOne(i, i === 'myepitech' ? refreshOpts : undefined)))
     },
     snapshot: (): Snapshots => ({ ...state }),
     start(intervalMs: number): () => void {

@@ -9,7 +9,7 @@ const subscribe = <T>(channel: string, cb: (payload: T) => void): (() => void) =
 
 const api: EpihubApi = {
   snapshot: () => ipcRenderer.invoke('epihub:snapshot'),
-  refresh: (id) => ipcRenderer.invoke('epihub:refresh', id),
+  refresh: (id, opts) => ipcRenderer.invoke('epihub:refresh', id, opts),
   deadlines: () => ipcRenderer.invoke('epihub:deadlines'),
   projects: () => ipcRenderer.invoke('epihub:projects'),
   project: (key, force) => ipcRenderer.invoke('epihub:project', key, force),

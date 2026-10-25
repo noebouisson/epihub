@@ -21,7 +21,6 @@ export const ALLOWED_DOMAINS: readonly string[] = [
   'github.com',
   'intra.epitech.eu',
   'my.epitech.eu',
-  'epitest.eu',
   'teams.microsoft.com',
   'cloud.microsoft',
   'office.com',

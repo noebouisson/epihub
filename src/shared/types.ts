@@ -53,7 +53,8 @@ export interface TeamsNotificationPayload { title: string; body: string; tag: st
 /** API exposée au renderer par le preload sous `window.epihub`. */
 export interface EpihubApi {
   snapshot(): Promise<{ [K in ServiceId]: ServiceSnapshot<K> }>
-  refresh(id?: ServiceId): Promise<void>
+  /** `{ force: true }` : action de l'utilisateur, My Epitech ignore alors sa pause de reconnexion. */
+  refresh(id?: ServiceId, opts?: { force?: boolean }): Promise<void>
   deadlines(): Promise<DeadlineView[]>
   projects(): Promise<ProjectSummary[]>
   project(key: string, force?: boolean): Promise<ProjectDetail | null>

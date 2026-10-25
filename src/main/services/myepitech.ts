@@ -1,5 +1,5 @@
 import type { MyEpitechData, MyProfile, MyProject, RunDetail, RunSummary, RunTest, SkillBreakdown } from '../../shared/types'
-import { type FetchLike, NeedsLoginError, type Service } from './types'
+import { type FetchLike, NeedsLoginError, type RefreshOptions, type Service } from './types'
 
 export const MYEPITECH_HOME = 'https://my.epitech.eu/'
 const BASE = 'https://my.epitech.eu/api'
@@ -148,18 +148,29 @@ export function decodeRunDetail(raw: Raw): RunDetail {
 
 const byDateDesc = (a: RunSummary, b: RunSummary): number => Date.parse(b.date) - Date.parse(a.date)
 
-/** Exécute `fn` sur chaque élément avec au plus `limit` appels simultanés. */
-async function pool<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
+/**
+ * Exécute `fn` sur chaque élément avec au plus `limit` appels simultanés.
+ * Dès qu'un appel échoue, plus aucun élément ne démarre (ceux en cours se terminent) ; l'erreur est remontée.
+ */
+export async function pool<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
   let next = 0
+  let aborted = false
   const worker = async (): Promise<void> => {
-    while (next < items.length) await fn(items[next++])
+    while (!aborted && next < items.length) {
+      try {
+        await fn(items[next++])
+      } catch (err) {
+        aborted = true
+        throw err
+      }
+    }
   }
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker))
 }
 
 export interface MyEpitechServiceDeps {
   fetch: FetchLike
-  auth: { getToken(): Promise<string | null>; invalidate(): void }
+  auth: { getToken(opts?: { force?: boolean }): Promise<string | null>; invalidate(): void }
   now(): number
 }
 
@@ -173,9 +184,9 @@ export function createMyEpitechService(deps: MyEpitechServiceDeps): MyEpitechSer
   const runCache = new Map<string, { at: number; runs: RunSummary[] }>()
 
   /** GET authentifié ; 401 → jeton oublié et une seule nouvelle tentative. `null` pour une réponse 400. */
-  async function get(path: string, allow400 = false): Promise<Raw | null> {
+  async function get(path: string, allow400 = false, force = false): Promise<Raw | null> {
     for (let attempt = 0; attempt < 2; attempt++) {
-      const token = await deps.auth.getToken()
+      const token = await deps.auth.getToken(force && attempt === 0 ? { force: true } : undefined)
       if (!token) throw new NeedsLoginError()
       const res = await deps.fetch(BASE + path, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } })
       if (res.status === 401) {
@@ -218,8 +229,9 @@ export function createMyEpitechService(deps: MyEpitechServiceDeps): MyEpitechSer
 
   return {
     id: 'myepitech',
-    async refresh(): Promise<MyEpitechData> {
-      const profile = decodeProfile(await get('/students/profile'))
+    async refresh(opts?: RefreshOptions): Promise<MyEpitechData> {
+      // `force` ne vaut que pour le premier appel : s'il échoue, les suivants respectent la pause.
+      const profile = decodeProfile(await get('/students/profile', false, opts?.force === true))
       const projects = (await allProjects()).filter((p) => isObj(p) && p.isUserRegistered === true).map(decodeProject)
       const now = deps.now()
       const runs: Record<string, RunSummary[]> = {}

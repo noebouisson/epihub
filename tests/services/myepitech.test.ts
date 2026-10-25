@@ -38,7 +38,7 @@ function setup(table: Record<string, Reply> = routes(), start = Date.parse('2026
     const r = table[path] ?? { status: 404, body: '{"message":"Not found"}' }
     return { status: r.status, ok: r.status >= 200 && r.status < 300, headers: { get: () => null }, text: async () => r.body }
   })
-  const auth = { getToken: vi.fn(async (): Promise<string | null> => 'tok'), invalidate: vi.fn() }
+  const auth = { getToken: vi.fn(async (_opts?: { force?: boolean }): Promise<string | null> => 'tok'), invalidate: vi.fn() }
   const svc = createMyEpitechService({ fetch, auth, now: () => clock.t })
   return { svc, fetch, auth, calls, auths, clock, table }
 }
@@ -183,6 +183,27 @@ describe('createMyEpitechService', () => {
     expect(Object.keys(d.runs)).toHaveLength(10)
     expect(peak).toBeLessThanOrEqual(4)
     expect(peak).toBeGreaterThan(1)
+  })
+
+  test('jeton perdu pendant les passages : aucun nouveau projet démarré', async () => {
+    const t = routes()
+    const many = Array.from({ length: 12 }, (_, i) => ({ ...json('projects-p1.json').data[0], id: 500 + i, name: `P${i}` }))
+    t['/units/instances/projects?page=1'] = ok(JSON.stringify({ data: many, meta: { pages: 1, hasNext: false } }))
+    const s = setup(t)
+    let n = 0
+    s.auth.getToken.mockImplementation(async () => (++n <= 3 ? 'tok' : null))
+    await expect(s.svc.refresh()).rejects.toBeInstanceOf(NeedsLoginError)
+    // profil + projets + 1 passage avec jeton ; les 3 autres workers échouent, aucun autre ne démarre
+    expect(s.auth.getToken.mock.calls.length).toBeLessThanOrEqual(2 + 4)
+  })
+
+  test('force transmis au premier appel de jeton seulement', async () => {
+    const s = setup()
+    await s.svc.refresh({ force: true })
+    expect(s.auth.getToken.mock.calls[0][0]).toEqual({ force: true })
+    expect(s.auth.getToken.mock.calls.slice(1).every((c) => !c[0]?.force)).toBe(true)
+    await s.svc.refresh()
+    expect(s.auth.getToken.mock.calls.every((c, i) => i === 0 || !c[0]?.force)).toBe(true)
   })
 
   test('runDetail décodé', async () => {
