@@ -71,3 +71,33 @@ export interface EpihubApi {
   onPalette(cb: () => void): () => void
   onOpen(cb: (target: OpenTarget) => void): () => void
 }
+
+/* ---- Rapports de moulinette ---- */
+export type Verdict = 'reussi' | 'partiel' | 'echoue'
+export interface SkillBreakdown { count: number; passed: number; crashed: number; mandatoryFailed: number }
+export interface RunStyle { fatal: number; major: number; minor: number; info: number; penalty: number | null }
+export interface RunSummary {
+  id: string; unitCode: string; projectCode: string; title: string; year: number
+  date: string; commit: string; members: string[]; failureFlags: string[]
+  style: RunStyle; coverage: { lines: number | null; branches: number | null }
+  categories: Record<string, SkillBreakdown>; repoLink: string | null
+}
+export interface RunTest { name: string; passed: boolean; crashed: boolean; skipped: boolean; mandatory: boolean; comment: string }
+export interface RunDetail {
+  categories: { name: string; tests: RunTest[] }[]
+  deliveryError: string | null; makeError: string | null; bannedFunctions: string[]
+  coverage: { lines: number | null; branches: number | null }
+}
+export interface ReportAdvice { priority: 1 | 2 | 3; title: string; text: string; tests: string[] }
+export interface Report {
+  runId: string; projectTitle: string; unitCode: string; projectCode: string
+  date: string; commit: string; members: string[]
+  score: number | null; verdict: Verdict; delta: number | null; summary: string
+  blockers: string[]
+  categories: { name: string; passed: number; count: number; crashed: number; mandatoryFailed: number }[]
+  failedTests: { category: string; name: string; mandatory: boolean; crashed: boolean; comment: string }[]
+  style: RunStyle; coverage: { lines: number | null; branches: number | null }
+  advice: ReportAdvice[]
+  evolution: { fixed: string[]; broken: string[]; byCategory: boolean } | null
+  working: string[]
+}
