@@ -24,37 +24,55 @@ async function section<T>(run: () => Promise<T>): Promise<Section<T>> {
   }
 }
 
-export function createProjectDetails(deps: ProjectDetailsDeps): { get(summary: ProjectSummary, force?: boolean): Promise<ProjectDetail> } {
-  // Ne stocke que les résultats de sections (jamais de jeton).
-  const cache = new Map<string, { at: number; sections: Sections }>()
+const signature = (s: ProjectSummary): string =>
+  [s.key, s.deadline?.url ?? '', s.repo ? `${s.repo.fullName}@${s.repo.defaultBranch}` : '', s.lastResult?.id ?? ''].join('|')
 
-  async function load(s: ProjectSummary): Promise<Sections> {
+/** Seules les sections ok ou unavailable sont mémorisées : needs-login et error sont retentées. */
+const cacheable = (sec: Section<unknown>): boolean => sec.state === 'ok' || sec.state === 'unavailable'
+
+export function createProjectDetails(deps: ProjectDetailsDeps): { get(summary: ProjectSummary, force?: boolean): Promise<ProjectDetail> } {
+  // Ne stocke que des résultats de sections (jamais de jeton), par clé de projet et signature de ses entrées.
+  const cache = new Map<string, { sig: string; at: number; sections: Partial<Sections> }>()
+
+  const loaders = (s: ProjectSummary): { [K in keyof Sections]: () => Promise<Sections[K]> } => {
     const { deadline, repo, lastResult } = s
-    const [subject, repoSection, results] = await Promise.all([
-      deadline ? section<SubjectData>(() => deps.intra.projectDetails(deadline.url)) : unavailable<SubjectData>(),
-      repo
-        ? section<RepoActivity>(async () => {
-            const [commits, pulls] = await Promise.all([deps.github.recentCommits(repo.fullName, repo.defaultBranch), deps.github.openPulls(repo.fullName)])
-            return { commits, pulls }
-          })
-        : unavailable<RepoActivity>(),
-      lastResult
-        ? section<ResultsData>(async () => {
-            const runs = await deps.myepitech.history(lastResult.module, lastResult.slug)
-            const last = runs[runs.length - 1]
-            return { runs, latest: last ? await deps.myepitech.runDetails(last.id) : [] }
-          })
-        : unavailable<ResultsData>()
-    ])
-    return { subject, repo: repoSection, results }
+    return {
+      subject: async () => (deadline ? section<SubjectData>(() => deps.intra.projectDetails(deadline.url)) : unavailable<SubjectData>()),
+      repo: async () =>
+        repo
+          ? section<RepoActivity>(async () => {
+              const [commits, pulls] = await Promise.all([deps.github.recentCommits(repo.fullName, repo.defaultBranch), deps.github.openPulls(repo.fullName)])
+              return { commits, pulls }
+            })
+          : unavailable<RepoActivity>(),
+      results: async () =>
+        lastResult
+          ? section<ResultsData>(async () => {
+              const runs = await deps.myepitech.history(lastResult.module, lastResult.slug)
+              const last = runs[runs.length - 1]
+              return { runs, latest: last ? await deps.myepitech.runDetails(last.id) : [] }
+            })
+          : unavailable<ResultsData>()
+    }
   }
 
   return {
     async get(summary, force = false) {
-      const hit = cache.get(summary.key)
-      if (!force && hit && deps.now() - hit.at < TTL) return { summary, ...hit.sections }
-      const sections = await load(summary)
-      cache.set(summary.key, { at: deps.now(), sections })
+      const sig = signature(summary)
+      let entry = cache.get(summary.key)
+      if (force || !entry || entry.sig !== sig || deps.now() - entry.at >= TTL) {
+        entry = { sig, at: deps.now(), sections: {} }
+        cache.set(summary.key, entry)
+      }
+      const held = entry.sections
+      const l = loaders(summary)
+      const [subject, repo, results] = await Promise.all([held.subject ?? l.subject(), held.repo ?? l.repo(), held.results ?? l.results()])
+      const sections: Sections = { subject, repo, results }
+      if (cache.get(summary.key) === entry) {
+        if (cacheable(subject)) entry.sections.subject = subject
+        if (cacheable(repo)) entry.sections.repo = repo
+        if (cacheable(results)) entry.sections.results = results
+      }
       return { summary, ...sections }
     }
   }

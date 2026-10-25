@@ -41,6 +41,9 @@ describe('createProjectsApi', () => {
     api.invalidate()
     await api.list()
     expect(deadlines).toHaveBeenCalledTimes(2)
+    clock.t = 2999
+    await api.list()
+    expect(deadlines).toHaveBeenCalledTimes(2)
     clock.t = 3001
     await api.list()
     expect(deadlines).toHaveBeenCalledTimes(3)

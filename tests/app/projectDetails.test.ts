@@ -79,4 +79,27 @@ describe('createProjectDetails', () => {
     expect(d.summary.teamsUrl).toBe('https://teams.microsoft.com/x')
     expect(m.intra.projectDetails).toHaveBeenCalledTimes(1)
   })
+  test('lier un repo (même clé) recharge la section repo sans force', async () => {
+    const m = make()
+    await m.svc.get({ ...full, repo: null })
+    const d = await m.svc.get(full)
+    expect(d.repo.state).toBe('ok')
+    expect(m.github.recentCommits).toHaveBeenCalledTimes(1)
+  })
+  test('nouveau passage My Epitech → résultats rechargés', async () => {
+    const m = make()
+    await m.svc.get(full)
+    await m.svc.get({ ...full, lastResult: { ...lastResult, id: 'r10' } })
+    expect(m.myepitech.history).toHaveBeenCalledTimes(2)
+  })
+  test('needs-login retenté au get suivant, sections ok depuis le cache', async () => {
+    let logged = false
+    const m = make({ intra: { projectDetails: async () => { if (!logged) throw new NeedsLoginError(); return { description: 'S', files: [] } } } })
+    expect((await m.svc.get(full)).subject.state).toBe('needs-login')
+    logged = true
+    const d = await m.svc.get(full)
+    expect(d.subject.state).toBe('ok')
+    expect(m.github.recentCommits).toHaveBeenCalledTimes(1)
+    expect(m.myepitech.history).toHaveBeenCalledTimes(1)
+  })
 })
