@@ -11,9 +11,32 @@ export interface PipelineDeps {
   docsDir: string
   writeFile(path: string, data: string): Promise<void>
   mkdir(path: string): Promise<void>
-  /** `runId` sert de clé de déduplication de la notification. */
-  notify(title: string, body: string, projectKey: string, runId: string): void
+  /**
+   * `dedupKey` : id du passage (ou des passages groupés) pour la déduplication.
+   * `projectKey` null : notification groupée (ouvre le tableau de bord).
+   */
+  notify(title: string, body: string, projectKey: string | null, dedupKey: string): void
   projectKeyOf(p: MyProject): string
+  now?(): number
+}
+
+/** Un passage plus ancien n'est pas notifié (le rapport est quand même généré). */
+export const NOTIFY_MAX_AGE_MS = 7 * 864e5
+/** Au-delà, une seule notification groupée. */
+export const MAX_SINGLE_NOTIFICATIONS = 3
+
+export interface PendingNotification { title: string; projectKey: string; runId: string; date: string }
+
+/** Notifications à envoyer pour un passage du lot : anciennes écartées, regroupées au-delà de 3. */
+export function planNotifications(pending: PendingNotification[], now: number): { title: string; body: string; projectKey: string | null; dedupKey: string }[] {
+  const fresh = pending.filter((n) => {
+    const t = Date.parse(n.date)
+    return !Number.isNaN(t) && now - t <= NOTIFY_MAX_AGE_MS
+  })
+  if (fresh.length > MAX_SINGLE_NOTIFICATIONS) {
+    return [{ title: `${fresh.length} nouveaux résultats de moulinette`, body: 'Rapports prêts', projectKey: null, dedupKey: fresh.map((n) => n.runId).join(',') }]
+  }
+  return fresh.map((n) => ({ title: n.title, body: 'Rapport prêt', projectKey: n.projectKey, dedupKey: n.runId }))
 }
 
 const errMsg = (err: unknown): string => (err instanceof Error ? err.message : String(err))
@@ -49,7 +72,8 @@ export function createReportPipeline(deps: PipelineDeps) {
     }
   }
 
-  async function generate(p: MyProject, key: string, runs: NonNullable<MyEpitechData['runs'][string]>, notify: boolean): Promise<void> {
+  /** Génère et enregistre le rapport ; renvoie la notification à prévoir (ou null). */
+  async function generate(p: MyProject, key: string, runs: NonNullable<MyEpitechData['runs'][string]>, notify: boolean): Promise<PendingNotification | null> {
     const [current, previous] = runs
     const detail = await deps.runDetail(current.id)
     const previousDetail = previous ? await deps.runDetail(previous.id).catch(() => null) : null
@@ -58,22 +82,26 @@ export function createReportPipeline(deps: PipelineDeps) {
     const entry: ReportEntry = { runId: current.id, projectKey: key, projectId: p.id, file, score: report.score, verdict: report.verdict, date: report.date, generatedAt: Date.now() }
     deps.store.save(entry, report)
     deps.store.clearSilent(current.id)
-    if (notify) {
-      const delta = report.delta === null ? '' : ` (${report.delta >= 0 ? '+' : ''}${report.delta})`
-      const score = report.score === null ? 'aucun test' : `${report.score} %`
-      deps.notify(`${report.projectTitle} : ${score}${delta}`, 'Rapport prêt', key, current.id)
-    }
+    if (!notify) return null
+    const delta = report.delta === null ? '' : ` (${report.delta >= 0 ? '+' : ''}${report.delta})`
+    const score = report.score === null ? 'aucun test' : `${report.score} %`
+    return { title: `${report.projectTitle} : ${score}${delta}`, projectKey: key, runId: current.id, date: report.date }
   }
 
   /** Réécrit le .md d'un rapport dont l'écriture avait échoué. */
-  async function retryWrite(entry: ReportEntry): Promise<void> {
+  async function retryWrite(entry: ReportEntry): Promise<boolean> {
     const report = deps.store.report(entry.runId)
-    if (!report) return
+    if (!report) return false
     const file = await writeMarkdown(report)
-    if (file) deps.store.save({ ...entry, file }, report)
+    if (!file) return false
+    deps.store.save({ ...entry, file }, report)
+    return true
   }
 
-  async function run(data: MyEpitechData): Promise<void> {
+  /** Renvoie le nombre de rapports enregistrés (nouveaux ou réécrits). */
+  async function run(data: MyEpitechData): Promise<number> {
+    let saved = 0
+    const pending: PendingNotification[] = []
     const wasInitialized = deps.store.isInitialized()
     let sawRuns = false
     let needsLogin = false
@@ -84,8 +112,11 @@ export function createReportPipeline(deps: PipelineDeps) {
       const key = deps.projectKeyOf(p)
       try {
         const existing = deps.store.get(runs[0].id)
-        if (!existing) await generate(p, key, runs, wasInitialized && !deps.store.isSilent(runs[0].id))
-        else if (existing.file === null) await retryWrite(existing)
+        if (!existing) {
+          const n = await generate(p, key, runs, wasInitialized && !deps.store.isSilent(runs[0].id))
+          saved++
+          if (n) pending.push(n)
+        } else if (existing.file === null && (await retryWrite(existing))) saved++
       } catch (err) {
         // Déconnecté : on arrête le lot ; les projets restants seront traités (sans pause silencieuse) au prochain passage.
         if (err instanceof NeedsLoginError) {
@@ -101,12 +132,14 @@ export function createReportPipeline(deps: PipelineDeps) {
     }
     // Lot initial interrompu par la déconnexion : il reprendra (toujours sans notification) au prochain passage.
     if (!wasInitialized && sawRuns && !needsLogin) deps.store.markInitialized()
+    for (const n of planNotifications(pending, (deps.now ?? Date.now)())) deps.notify(n.title, n.body, n.projectKey, n.dedupKey)
+    return saved
   }
 
-  let lock: Promise<void> = Promise.resolve()
+  let lock: Promise<unknown> = Promise.resolve()
   return {
     /** Générations sérialisées : deux appels simultanés ne produisent jamais de doublon. */
-    process(data: MyEpitechData): Promise<void> {
+    process(data: MyEpitechData): Promise<number> {
       const next = lock.then(() => run(data))
       lock = next.catch(() => undefined)
       return next

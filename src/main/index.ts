@@ -127,7 +127,8 @@ function start(): void {
     docsDir: app.getPath('documents'),
     writeFile: (path, data) => writeFile(path, data, 'utf8'),
     mkdir: (path) => mkdir(path, { recursive: true }).then(() => undefined),
-    notify: (title, body, key, runId) => void hub.push(`myepitech:run:${runId}`, 'myepitech', title, body, `project:${key}`, undefined, 'app'),
+    // Notification groupée (key null) : ouvre le tableau de bord.
+    notify: (title, body, key, dedupKey) => void hub.push(`myepitech:run:${dedupKey}`, 'myepitech', title, body, key === null ? 'dashboard' : `project:${key}`, undefined, 'app'),
     projectKeyOf: (p) => projectKey(p.unitCode, p.name)
   });
 
@@ -153,7 +154,14 @@ function start(): void {
         }
         runEffects();
         const mine = registry.snapshot().myepitech.data;
-        if (id === 'myepitech' && mine) void reportPipeline.process(mine).catch((err: unknown) => console.error('[epihub] rapports:', errMsg(err)));
+        if (id === 'myepitech' && mine) {
+          void reportPipeline
+            .process(mine)
+            .then((saved) => {
+              if (saved > 0) mainWindow?.webContents.send('epihub:reports-changed');
+            })
+            .catch((err: unknown) => console.error('[epihub] rapports:', errMsg(err)));
+        }
       }
     }
   });

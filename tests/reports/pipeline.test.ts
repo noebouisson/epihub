@@ -30,7 +30,7 @@ function setup(freshStore = false) {
   const writeFile = vi.fn(async (_p: string, _d: string) => {})
   const mkdir = vi.fn(async (_p: string) => {})
   const notify = vi.fn()
-  const pipe = createReportPipeline({ runDetail, store, docsDir: '/docs', writeFile, mkdir, notify, projectKeyOf: (p) => projectKey(p.unitCode, p.name) })
+  const pipe = createReportPipeline({ runDetail, store, docsDir: '/docs', writeFile, mkdir, notify, projectKeyOf: (p) => projectKey(p.unitCode, p.name), now: () => Date.parse('2026-10-21T00:00:00') })
   return { store, runDetail, writeFile, mkdir, notify, pipe }
 }
 
@@ -149,6 +149,41 @@ test('projet sans passage ignoré', async () => {
   const { pipe, runDetail } = setup()
   await pipe.process({ ...data, runs: {} })
   expect(runDetail).not.toHaveBeenCalled()
+})
+
+const many = (n: number, date = '2026-10-20T08:05:00'): MyEpitechData => ({
+  ...data,
+  projects: Array.from({ length: n }, (_, i) => ({ ...project, id: `q${i}`, name: `Projet ${i}` })),
+  runs: Object.fromEntries(Array.from({ length: n }, (_, i) => [`q${i}`, [sum({ id: String(7000 + i), title: `Projet ${i}`, date })]]))
+})
+
+test('process renvoie le nombre de rapports enregistrés', async () => {
+  const { pipe } = setup()
+  expect(await pipe.process(data)).toBe(1)
+  expect(await pipe.process(data)).toBe(0)
+})
+
+test('passage de plus de 7 jours : rapport généré, pas de notification', async () => {
+  const { pipe, notify, store } = setup()
+  await pipe.process(many(1, '2026-10-13T08:00:00'))
+  expect(store.has('7000')).toBe(true)
+  expect(notify).not.toHaveBeenCalled()
+})
+
+test('jusqu’à 3 notifications individuelles', async () => {
+  const { pipe, notify } = setup()
+  await pipe.process(many(3))
+  expect(notify).toHaveBeenCalledTimes(3)
+  expect(notify.mock.calls.map((c) => c[3])).toEqual(['7000', '7001', '7002'])
+})
+
+test('plus de 3 : une seule notification groupée', async () => {
+  const { pipe, notify, store } = setup()
+  await pipe.process(many(4))
+  expect(store.has('7003')).toBe(true)
+  expect(notify).toHaveBeenCalledTimes(1)
+  expect(notify.mock.calls[0][0]).toBe('4 nouveaux résultats de moulinette')
+  expect(notify.mock.calls[0][2]).toBeNull()
 })
 
 test('pdfPathFor : à côté du .md, nom nettoyé', () => {

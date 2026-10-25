@@ -23,13 +23,15 @@ const api: EpihubApi = {
   teamsTitle: (t) => ipcRenderer.invoke('epihub:teams:title', t),
   teamsNavigate: (u) => ipcRenderer.invoke('epihub:teams:navigate', u),
   teamsNotification: (n) => ipcRenderer.invoke('epihub:teams:notification', n),
+  latestReports: () => ipcRenderer.invoke('epihub:latestReports'),
   reports: (key) => ipcRenderer.invoke('epihub:reports', key),
   report: (id) => ipcRenderer.invoke('epihub:report', id),
   openReportFile: (id) => ipcRenderer.invoke('epihub:openReportFile', id),
   exportReportPdf: (id) => ipcRenderer.invoke('epihub:exportReportPdf', id),
   onChanged: (cb) => subscribe('epihub:changed', cb),
   onPalette: (cb) => subscribe<void>('epihub:palette', () => cb()),
-  onOpen: (cb) => subscribe('epihub:open', cb)
+  onOpen: (cb) => subscribe('epihub:open', cb),
+  onReportsChanged: (cb) => subscribe<void>('epihub:reports-changed', () => cb())
 }
 
 contextBridge.exposeInMainWorld('epihub', api)

@@ -59,9 +59,12 @@ export function Project({ projectKey: key, anchor, settings, repos, open, toast,
     const load = (): void => void window.epihub.reports(key).then((l) => live && setEntries(l)).catch(() => live && setEntries((c) => c ?? []));
     load();
     const off = window.epihub.onChanged(load);
+    // Rapport enregistré après le rafraîchissement : affiché sans rouvrir la page.
+    const offReports = window.epihub.onReportsChanged(load);
     return () => {
       live = false;
       off();
+      offReports();
     };
   }, [key]);
 
@@ -241,7 +244,7 @@ export function Project({ projectKey: key, anchor, settings, repos, open, toast,
             {entries === null ? (
               <p className="dim">Chargement…</p>
             ) : entries.length === 0 ? (
-              <p className="dim">Pas encore de rapport — il sera généré au prochain passage de la moulinette</p>
+              <p className="dim">{summary.lastResult ? 'Rapport en cours de génération…' : 'Pas encore de rapport — il sera généré au prochain passage de la moulinette'}</p>
             ) : (
               <>
                 <div className="form-row wrap">

@@ -1,5 +1,5 @@
-import { scoreOf, verdictOf } from '../../../shared/score';
-import type { ProjectSummary, RunSummary } from '../../../shared/types';
+import { scoreOf } from '../../../shared/score';
+import type { ProjectSummary, RunSummary, Verdict } from '../../../shared/types';
 import { mainProblem, progressOf } from '../dashboard';
 import { VERDICT_BADGE, VERDICT_LABEL } from './ReportView';
 
@@ -9,17 +9,18 @@ interface Props {
   start: string | null;
   /** Passage précédent, pour la flèche Δ. */
   previous: RunSummary | null;
+  /** Verdict du dernier passage (celui du rapport s'il existe, voir `verdictFor`). */
+  verdict: Verdict | null;
   now: Date;
   /** `anchor` : `rapport` (carte Moulinette) seulement s'il existe un passage. */
   onOpen(key: string, anchor?: string): void;
 }
 
-export function ProjectCard({ project: p, start, previous, now, onOpen }: Props): JSX.Element {
+export function ProjectCard({ project: p, start, previous, verdict, now, onOpen }: Props): JSX.Element {
   const last = p.lastResult;
   const score = last ? scoreOf(last.categories) : null;
   const prevScore = previous ? scoreOf(previous.categories) : null;
   const delta = score !== null && prevScore !== null ? score - prevScore : null;
-  const verdict = last ? verdictOf(last, null) : null;
   const progress = p.deadline ? progressOf(start ?? p.deadline.end, p.deadline.end, now) : null;
   return (
     <section className="card project-card">

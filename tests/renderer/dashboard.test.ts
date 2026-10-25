@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
-import { dashboardSummary, latestResults, mainProblem, progressOf, sortProjects } from '../../src/renderer/src/dashboard';
-import type { DeadlineView, MyEpitechData, MyProject, ProjectSummary, RunSummary, SkillBreakdown } from '../../src/shared/types';
+import { dashboardSummary, latestResults, notConnectedBanner, verdictFor, mainProblem, progressOf, sortProjects } from '../../src/renderer/src/dashboard';
+import type { DeadlineView, MyEpitechData, ReportEntry, MyProject, ProjectSummary, RunSummary, SkillBreakdown } from '../../src/shared/types';
 
 const now = new Date('2026-10-16T12:00:00');
 
@@ -83,4 +83,24 @@ test('derniers résultats : ouverts par la clé canonique du projet (pas le code
   const r = latestResults(data, 5);
   expect(r.map((x) => [x.run.id, x.key])).toEqual([['21', 'G-CPE-101/bistromatic'], ['11', 'G-CPE-101/myprintf'], ['31', 'B-CPE-100/cpe100']]);
   expect(latestResults(data, 1)).toHaveLength(1);
+});
+
+test('bandeau : « en échec » ne compte que les projets en cours', () => {
+  const termineEchoue = project('d', 'termine', '2026-10-01T12:00:00', badRun);
+  expect(dashboardSummary([enCoursOk, enCoursEchoue, termineEchoue], now).failing).toBe(1);
+});
+
+const entry = (runId: string, verdict: ReportEntry['verdict']): ReportEntry => ({ runId, projectKey: 'a', projectId: 'a', file: null, score: 10, verdict, date: '', generatedAt: 0 });
+
+test('verdict : celui du rapport du dernier passage, sinon calculé', () => {
+  expect(verdictFor(enCoursOk, { a: entry('1', 'echoue') })).toBe('echoue');
+  expect(verdictFor(enCoursOk, { a: entry('autre', 'echoue') })).toBe('reussi');
+  expect(verdictFor(enCoursOk, {})).toBe('reussi');
+  expect(verdictFor(project('z', 'en-cours', null, null), {})).toBeNull();
+  expect(dashboardSummary([enCoursOk], now, { a: entry('1', 'echoue') }).failing).toBe(1);
+});
+
+test('bandeau « pas connecté » avec l’heure des données', () => {
+  expect(notConnectedBanner(new Date('2026-10-16T09:05:00').getTime())).toBe('Pas connecté à My Epitech — données de 09:05');
+  expect(notConnectedBanner(undefined)).toBe('Pas connecté à My Epitech');
 });

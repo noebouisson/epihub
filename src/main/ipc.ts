@@ -6,7 +6,7 @@ import { clip, TEAMS_DEDUP_TTL, teamsKey } from './app/effects'
 import { buildSearchItems, search } from './links/searchIndex'
 import { shareText } from './links/shareText'
 import { isInsideDir, pdfPathFor } from './reports/pipeline'
-import { reportsForKey } from './reports/query'
+import { latestReportsFor, reportsForKey } from './reports/query'
 import { validRunId, type ReportStore } from './reports/store'
 import { refreshArgs } from './ipcArgs'
 import { isTrustedSender } from './securityPolicy'
@@ -115,6 +115,9 @@ export function registerIpc(deps: IpcDeps): void {
     const projects = await deps.projects.list().catch(() => [])
     return reportsForKey(deps.reports.store, projects, key)
   })
+  handle('epihub:latestReports', async (): Promise<Record<string, ReportEntry>> =>
+    latestReportsFor(deps.reports.store, await deps.projects.list().catch(() => []))
+  )
   handle('epihub:report', (_e, runId: unknown): Report | null => (validRunId(runId) ? deps.reports.store.report(runId) : null))
   handle('epihub:openReportFile', async (_e, runId: unknown): Promise<boolean> => {
     if (!validRunId(runId)) return false

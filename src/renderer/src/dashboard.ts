@@ -1,6 +1,6 @@
 import { scoreOf, verdictOf } from '../../shared/score';
 import { projectKey } from '../../shared/projects';
-import type { MyEpitechData, ProjectSummary, RunSummary } from '../../shared/types';
+import type { MyEpitechData, ProjectSummary, ReportEntry, RunSummary, Verdict } from '../../shared/types';
 
 const DAY = 86_400_000;
 
@@ -61,13 +61,22 @@ export function sortProjects(projects: ProjectSummary[]): ProjectSummary[] {
   return [...running, ...done];
 }
 
-export function dashboardSummary(projects: ProjectSummary[], now: Date): { inProgress: number; failing: number; average: number | null; next: ProjectSummary | null } {
+/** Verdict du dernier passage : celui du rapport enregistré s'il existe (carte = rapport), sinon calculé sans détail. */
+export function verdictFor(p: ProjectSummary, entries: Record<string, ReportEntry>): Verdict | null {
+  const last = p.lastResult;
+  if (!last) return null;
+  const e = entries[p.key];
+  return e && e.runId === last.id ? e.verdict : verdictOf(last, null);
+}
+
+/** `failing` : projets EN COURS dont le dernier passage est en échec. */
+export function dashboardSummary(projects: ProjectSummary[], now: Date, entries: Record<string, ReportEntry> = {}): { inProgress: number; failing: number; average: number | null; next: ProjectSummary | null } {
   const running = projects.filter((p) => p.status === 'en-cours');
   const scores = projects.map((p) => (p.lastResult ? scoreOf(p.lastResult.categories) : null)).filter((s): s is number => s !== null);
   const upcoming = running.filter((p) => endOf(p) >= now.getTime()).sort((a, b) => endOf(a) - endOf(b));
   return {
     inProgress: running.length,
-    failing: projects.filter((p) => p.lastResult && verdictOf(p.lastResult, null) === 'echoue').length,
+    failing: running.filter((p) => verdictFor(p, entries) === 'echoue').length,
     average: scores.length === 0 ? null : Math.round(scores.reduce((a, b) => a + b, 0) / scores.length),
     next: upcoming[0] ?? null
   };
@@ -90,4 +99,13 @@ export function latestResults(data: MyEpitechData | null | undefined, limit: num
     .filter((x): x is { run: RunSummary; key: string } => x !== null)
     .sort((a, b) => Date.parse(b.run.date) - Date.parse(a.run.date))
     .slice(0, limit);
+}
+
+const pad2 = (n: number): string => String(n).padStart(2, '0');
+
+/** Bandeau affiché au-dessus des cartes quand les données en cache sont montrées sans connexion. */
+export function notConnectedBanner(updatedAt: number | undefined): string {
+  if (updatedAt === undefined || Number.isNaN(updatedAt)) return 'Pas connecté à My Epitech';
+  const d = new Date(updatedAt);
+  return `Pas connecté à My Epitech — données de ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 }

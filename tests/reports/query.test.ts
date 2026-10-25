@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, expect, test } from 'vitest'
-import { reportsForKey } from '../../src/main/reports/query'
+import { latestReportsFor, reportsForKey } from '../../src/main/reports/query'
 import { createReportStore } from '../../src/main/reports/store'
 import type { ReportEntry } from '../../src/shared/types'
 import { rep } from './helpers'
@@ -20,4 +20,17 @@ test('reportsForKey : un alias est résolu vers la clé canonique', () => {
   expect(reportsForKey(store, projects, 'G-CPE-101/cpemyprintf').map((e) => e.runId)).toEqual(['1'])
   expect(reportsForKey(store, projects, 'G-CPE-101/myprintf').map((e) => e.runId)).toEqual(['1'])
   expect(reportsForKey(store, projects, 'X/inconnu')).toEqual([])
+})
+
+test('latestReportsFor : entrée du dernier passage de chaque projet, par clé canonique', () => {
+  const store = createReportStore(dir)
+  store.save(entry('1', 'G-CPE-101/myprintf'), rep({ runId: '1' }))
+  const last = (id: string) => ({ id } as never)
+  const list = [
+    { key: 'G-CPE-101/myprintf', aliases: [], lastResult: last('1') },
+    { key: 'G-CPE-101/other', aliases: [], lastResult: last('2') },
+    { key: 'G-CPE-101/none', aliases: [], lastResult: null }
+  ]
+  expect(Object.keys(latestReportsFor(store, list))).toEqual(['G-CPE-101/myprintf'])
+  expect(latestReportsFor(store, list)['G-CPE-101/myprintf'].runId).toBe('1')
 })

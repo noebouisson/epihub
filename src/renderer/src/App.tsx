@@ -64,13 +64,15 @@ export function App(): JSX.Element {
     const offOpen = window.epihub.onOpen((t: OpenTarget) => {
       // Notification de rapport : page du projet, sur la carte Moulinette.
       if (t.service === 'app' && t.url?.startsWith(PROJECT_PREFIX) && t.url.length > PROJECT_PREFIX.length) openProject(t.url.slice(PROJECT_PREFIX.length), 'rapport');
+      // Notification groupée de rapports : tableau de bord.
+      else if (t.service === 'app' && t.url === 'dashboard') select('dashboard');
       else open(t.service, t.url);
     });
     return () => {
       offChanged();
       offOpen();
     };
-  }, [open, openProject]);
+  }, [open, openProject, select]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = settings?.theme ?? 'dark';

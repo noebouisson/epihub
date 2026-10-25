@@ -72,6 +72,10 @@ export interface EpihubApi {
   onChanged(cb: (snapshot: { [K in ServiceId]: ServiceSnapshot<K> }) => void): () => void
   onPalette(cb: () => void): () => void
   onOpen(cb: (target: OpenTarget) => void): () => void
+  /** Un rapport a été enregistré (nouveau passage ou fichier réécrit) : les pages rechargent leurs rapports. */
+  onReportsChanged(cb: () => void): () => void
+  /** Clé canonique du projet → entrée de rapport de son dernier passage. */
+  latestReports(): Promise<Record<string, ReportEntry>>
   reports(projectKey: string): Promise<ReportEntry[]>
   report(runId: string): Promise<Report | null>
   openReportFile(runId: string): Promise<boolean>
