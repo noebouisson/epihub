@@ -129,6 +129,19 @@ describe('my epitech à la demande', () => {
     await expect(svc.history('M', 'x')).rejects.toBeInstanceOf(NeedsLoginError)
     await expect(svc.runDetails('1')).rejects.toBeInstanceOf(NeedsLoginError)
   })
+  test('runDetails : enveloppe quelconque à une clé et compétence sans tests', async () => {
+    const body = JSON.stringify({ results: { skills: {
+      a: { BreakdownSkillReport: { name: 'a', breakdown: {}, passed: 3, count: 4 } },
+      b: { OtherReport: { name: 'b', tests: [{ name: 't', passed: true, crashed: false }] } },
+      c: { name: 'c' }
+    } } })
+    const d = await createMyEpitechService(mk(body), async () => 't', now).runDetails('44')
+    expect(d).toEqual([
+      { name: 'a', passed: 3, count: 4, tests: [] },
+      { name: 'b', passed: 1, count: 1, tests: [{ name: 't', passed: true, crashed: false }] },
+      { name: 'c', passed: 0, count: 0, tests: [] }
+    ])
+  })
   test('les résultats exposent le slug', async () => {
     expect((await createMyEpitechService(mk(me), async () => 't', now).refresh()).results[0].slug).toBe('cpoolday01')
   })

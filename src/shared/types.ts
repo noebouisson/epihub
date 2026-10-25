@@ -41,7 +41,8 @@ export interface RepoActivity { commits: Commit[]; pulls: PullSummary[] }
 export interface TestRun { id: string; date: string; percent: number }
 export interface TestCase { name: string; passed: boolean; crashed: boolean }
 export interface SkillReport { name: string; passed: number; count: number; tests: TestCase[] }
-export interface ResultsData { runs: TestRun[]; latest: SkillReport[] }
+/** `latestError` : le détail du dernier passage n'a pas pu être chargé (l'historique reste affiché). */
+export interface ResultsData { runs: TestRun[]; latest: SkillReport[]; latestError?: string }
 export interface ProjectDetail { summary: ProjectSummary; subject: Section<SubjectData>; repo: Section<RepoActivity>; results: Section<ResultsData> }
 
 export type SetTokenResult = { ok: true } | { ok: false; error: 'ENCRYPTION_UNAVAILABLE' }

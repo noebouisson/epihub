@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { beforeEach, describe, expect, test } from 'vitest'
-import { createIntraService, parseIntraDate, parseTitleLink } from '../../src/main/services/intra'
+import { createIntraService, isIntraProjectUrl, parseIntraDate, parseTitleLink } from '../../src/main/services/intra'
 import { NeedsLoginError, type FetchLike } from '../../src/main/services/types'
 
 const fx = (n: string): string => readFileSync(`tests/fixtures/intra/${n}`, 'utf8')
@@ -116,5 +116,46 @@ describe('intra projectDetails', () => {
       text: async () => (url.includes('/file/') ? '{"a":1}' : fx('project.json'))
     })
     expect((await createIntraService(f).projectDetails(PROJECT_URL)).files).toEqual([])
+  })
+  const serve = (project: { status?: number; body: string }, files: { status?: number; body: string } | Error = { body: '[]' }): FetchLike =>
+    async (url) => {
+      if (url.includes('/file/') && files instanceof Error) throw files
+      const r = url.includes('/file/') ? (files as { status?: number; body: string }) : project
+      const status = r.status ?? 200
+      return { status, ok: status < 400, headers: { get: () => null }, text: async () => r.body }
+    }
+  test('isIntraProjectUrl', () => {
+    expect(isIntraProjectUrl(PROJECT_URL)).toBe(true)
+    for (const u of ['https://intra.epitech.eu/planning/', 'https://intra.epitech.eu/module/2026/G-CPE-100/LYN-0-1/acti-900/', 'https://intra.epitech.eu.evil.com/module/a/b/c/d/project/', 'http://intra.epitech.eu/module/a/b/c/d/project/'])
+      expect(isIntraProjectUrl(u)).toBe(false)
+  })
+  test('projectDetails : page non projet refusée', async () => {
+    await expect(intra.projectDetails('https://intra.epitech.eu/planning/')).rejects.toThrow('URL intranet invalide')
+  })
+  test('projectDetails : fichiers en erreur → [] (sujet gardé)', async () => {
+    for (const files of [{ status: 404, body: '{"message":"not found"}' }, { body: 'pas du json' }, new Error('réseau')]) {
+      const s = await createIntraService(serve({ body: fx('project.json') }, files)).projectDetails(PROJECT_URL)
+      expect(s.files).toEqual([])
+      expect(s.description).toContain('cinq')
+    }
+  })
+  test('projectDetails : fichiers en page de connexion → NeedsLoginError', async () => {
+    await expect(createIntraService(serve({ body: fx('project.json') }, { body: fx('login.html') })).projectDetails(PROJECT_URL)).rejects.toBeInstanceOf(NeedsLoginError)
+  })
+  test('projectDetails : JSON {message} ou 404 → Sujet indisponible (pas de reconnexion)', async () => {
+    for (const project of [{ body: '{"message":"Unknown activity"}' }, { status: 404, body: '{"message":"x"}' }, { status: 500, body: 'oops' }]) {
+      const err = await createIntraService(serve(project)).projectDetails(PROJECT_URL).catch((e: unknown) => e)
+      expect(err).toBeInstanceOf(Error)
+      expect(err).not.toBeInstanceOf(NeedsLoginError)
+      expect((err as Error).message).toBe('Sujet indisponible')
+    }
+  })
+  test('projectDetails : 401 / 403 → NeedsLoginError', async () => {
+    for (const status of [401, 403]) await expect(createIntraService(serve({ status, body: '' })).projectDetails(PROJECT_URL)).rejects.toBeInstanceOf(NeedsLoginError)
+  })
+  test('projectDetails : entités françaises et ponctuation décodées', async () => {
+    const body = JSON.stringify({ description: '&eacute;&egrave;&ecirc;&euml;&agrave;&acirc;&ccedil;&ugrave;&ucirc;&ocirc;&icirc;&iuml;&oelig; &Eacute;&Egrave;&Agrave;&Ccedil; &rsquo;&lsquo;&ldquo;&rdquo;&laquo;&raquo;&hellip;&ndash;&mdash;&euro;&deg; &unknown; &#x110000;' })
+    const s = await createIntraService(serve({ body })).projectDetails(PROJECT_URL)
+    expect(s.description).toBe('éèêëàâçùûôîïœ ÉÈÀÇ ’‘“”«»…–—€° &unknown; &#x110000;')
   })
 })

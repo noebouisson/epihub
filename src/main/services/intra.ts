@@ -23,12 +23,20 @@ export function parseTitleLink(link: string): { moduleCode: string; projectCode:
   return { moduleCode: m[1], projectCode: '' }
 }
 
-const ENTITIES = new Map([['nbsp', ' '], ['amp', '&'], ['lt', '<'], ['gt', '>'], ['quot', '"']])
+const ENTITIES = new Map([
+  ['nbsp', ' '], ['amp', '&'], ['lt', '<'], ['gt', '>'], ['quot', '"'],
+  ['eacute', 'é'], ['egrave', 'è'], ['ecirc', 'ê'], ['euml', 'ë'], ['agrave', 'à'], ['acirc', 'â'], ['ccedil', 'ç'],
+  ['ugrave', 'ù'], ['ucirc', 'û'], ['ocirc', 'ô'], ['icirc', 'î'], ['iuml', 'ï'], ['oelig', 'œ'],
+  ['Eacute', 'É'], ['Egrave', 'È'], ['Agrave', 'À'], ['Ccedil', 'Ç'],
+  ['rsquo', '’'], ['lsquo', '‘'], ['ldquo', '“'], ['rdquo', '”'], ['laquo', '«'], ['raquo', '»'],
+  ['hellip', '…'], ['ndash', '–'], ['mdash', '—'], ['euro', '€'], ['deg', '°']
+])
 
 /** Décode les entités HTML courantes (nommées, décimales, hexadécimales) ; le reste est laissé tel quel. */
 const decodeEntities = (s: string): string =>
   s.replace(/&(?:#(\d+)|#x([0-9a-f]+)|([a-z]+));/gi, (m, dec?: string, hex?: string, name?: string) => {
-    if (name) return ENTITIES.get(name.toLowerCase()) ?? m
+    // Sensible à la casse (&Eacute; ≠ &eacute;), avec repli en minuscules pour &AMP;, &NBSP;…
+    if (name) return ENTITIES.get(name) ?? ENTITIES.get(name.toLowerCase()) ?? m
     const code = dec ? parseInt(dec, 10) : parseInt(hex as string, 16)
     return code <= 0x10ffff ? String.fromCodePoint(code) : m
   })
@@ -56,13 +64,52 @@ async function getJson(fetch: FetchLike, path: string): Promise<any> {
   return json
 }
 
+const PROJECT_URL = /^https:\/\/intra\.epitech\.eu\/module\/[^/]+\/[^/]+\/[^/]+\/[^/]+\/project\//
+
+/** true pour une page projet de l'intranet (`/module/<année>/<module>/<instance>/<acti>/project/`). */
+export function isIntraProjectUrl(url: string): boolean {
+  return PROJECT_URL.test(url)
+}
+
+const SUBJECT_UNAVAILABLE = 'Sujet indisponible'
+
+/**
+ * GET pour la page projet : reconnexion seulement sur 401/403 ou une page de connexion ;
+ * un JSON `{message}`, un 404 ou toute autre réponse inattendue → « Sujet indisponible ».
+ */
+async function getProjectJson(fetch: FetchLike, path: string): Promise<any> {
+  const res = await fetch(BASE + path)
+  if (res.status === 401 || res.status === 403) throw new NeedsLoginError()
+  const text = await res.text()
+  if (!/^\s*[{[]/.test(text)) {
+    if (text.includes('login.microsoftonline.com') || /<form[\s>]/i.test(text)) throw new NeedsLoginError()
+    throw new Error(SUBJECT_UNAVAILABLE)
+  }
+  if (!res.ok) throw new Error(SUBJECT_UNAVAILABLE)
+  let json: any
+  try {
+    json = JSON.parse(text)
+  } catch {
+    throw new Error(SUBJECT_UNAVAILABLE)
+  }
+  if (json && typeof json === 'object' && !Array.isArray(json) && 'message' in json && !('title' in json) && !('description' in json)) {
+    throw new Error(SUBJECT_UNAVAILABLE)
+  }
+  return json
+}
+
 export function createIntraService(fetch: FetchLike): Service<'intra'> & { projectDetails(url: string): Promise<SubjectData> } {
   return {
     id: 'intra',
     async projectDetails(url): Promise<SubjectData> {
-      if (!url.startsWith(BASE + '/')) throw new Error('URL intranet invalide')
+      if (!isIntraProjectUrl(url)) throw new Error('URL intranet invalide')
       const path = url.slice(BASE.length).replace(/[?#].*$/, '').replace(/\/?$/, '/')
-      const [project, files] = await Promise.all([getJson(fetch, `${path}?format=json`), getJson(fetch, `${path}file/?format=json`)])
+      // Liste de fichiers : au mieux (seule une demande de reconnexion est remontée).
+      const filesOrEmpty = getProjectJson(fetch, `${path}file/?format=json`).catch((e: unknown) => {
+        if (e instanceof NeedsLoginError) throw e
+        return []
+      })
+      const [project, files] = await Promise.all([getProjectJson(fetch, `${path}?format=json`), filesOrEmpty])
       return {
         description: stripTags(project?.description ?? ''),
         files: (Array.isArray(files) ? files : [])

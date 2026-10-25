@@ -4,7 +4,7 @@ import { NeedsLoginError } from '../../src/main/services/types'
 import type { DeadlineView, ProjectSummary, Repo, TestResult } from '../../src/shared/types'
 
 const repo: Repo = { fullName: 'octocat/cpoolday01', name: 'cpoolday01', url: 'https://github.com/octocat/cpoolday01', pushedAt: '2026-10-01T00:00:00Z', defaultBranch: 'main' }
-const deadline: DeadlineView = { id: 'acti-1', moduleCode: 'G-CPE-100', projectCode: 'cpoolday01', title: 'Day 01', end: '2026-10-30T00:00:00Z', url: 'https://intra.example/p', repo, lastCommit: null, alert: null, manual: false }
+const deadline: DeadlineView = { id: 'acti-1', moduleCode: 'G-CPE-100', projectCode: 'cpoolday01', title: 'Day 01', end: '2026-10-30T00:00:00Z', url: 'https://intra.epitech.eu/module/2026/G-CPE-100/LYN-0-1/acti-1/project/', repo, lastCommit: null, alert: null, manual: false }
 const lastResult: TestResult = { id: 'r9', project: 'Day 01', module: 'G-CPE-100', slug: 'cpoolday01', date: '2026-10-20T00:00:00Z', percent: 50, url: 'u' }
 const full: ProjectSummary = { key: 'G-CPE-100/day01', aliases: ['G-CPE-100/day01'], title: 'Day 01', moduleCode: 'G-CPE-100', deadline, lastResult, repo, teamsUrl: null, status: 'en-cours' }
 
@@ -101,5 +101,31 @@ describe('createProjectDetails', () => {
     expect(d.subject.state).toBe('ok')
     expect(m.github.recentCommits).toHaveBeenCalledTimes(1)
     expect(m.myepitech.history).toHaveBeenCalledTimes(1)
+  })
+  test('runDetails en échec : historique gardé, détail signalé, section ok', async () => {
+    const d = await details({ myepitech: { runDetails: failing(new Error('Format My Epitech inattendu')) } }).get(full)
+    expect(d.results.state).toBe('ok')
+    expect(d.results.data?.runs).toHaveLength(3)
+    expect(d.results.data).toMatchObject({ latest: [], latestError: 'Format My Epitech inattendu' })
+  })
+  test('runDetails NeedsLoginError : historique gardé quand même', async () => {
+    const d = await details({ myepitech: { runDetails: failing(new NeedsLoginError()) } }).get(full)
+    expect(d.results.state).toBe('ok')
+    expect(d.results.data?.latestError).toBeTruthy()
+  })
+  test('history NeedsLoginError → needs-login', async () => {
+    expect((await details({ myepitech: { history: failing(new NeedsLoginError()) } }).get(full)).results.state).toBe('needs-login')
+  })
+  test('slug vide → résultats unavailable, aucun appel', async () => {
+    const m = make()
+    const d = await m.svc.get({ ...full, lastResult: { ...lastResult, slug: '' } })
+    expect(d.results.state).toBe('unavailable')
+    expect(m.myepitech.history).not.toHaveBeenCalled()
+  })
+  test('lien intranet qui n’est pas une page projet → sujet unavailable, aucun appel', async () => {
+    const m = make()
+    const d = await m.svc.get({ ...full, deadline: { ...deadline, url: 'https://intra.epitech.eu/planning/' } })
+    expect(d.subject.state).toBe('unavailable')
+    expect(m.intra.projectDetails).not.toHaveBeenCalled()
   })
 })

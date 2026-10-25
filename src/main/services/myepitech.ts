@@ -44,6 +44,14 @@ function percentOf(skills: any): number {
   return count === 0 ? 0 : Math.round((100 * passed) / count)
 }
 
+/** Compétence enveloppée dans un objet à une seule clé (`FullSkillReport`, `BreakdownSkillReport`, …) → son contenu. */
+function unwrapSkill(v: any): any {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return v
+  const keys = Object.keys(v)
+  const inner = keys.length === 1 ? v[keys[0]] : undefined
+  return inner && typeof inner === 'object' && !Array.isArray(inner) ? inner : v
+}
+
 export function createMyEpitechService(
   fetch: FetchLike,
   getToken: () => Promise<string | null>,
@@ -109,7 +117,7 @@ export function createMyEpitechService(
     async runDetails(testRunId): Promise<SkillReport[]> {
       const json = await apiJson(`https://api.epitest.eu/me/details/${encodeURIComponent(testRunId)}`)
       const skills = json?.results?.skills ?? json?.skills
-      // Tableau, ou objet indexé par nom de compétence ; chaque valeur : { FullSkillReport: {...} } ou directement {...}.
+      // Tableau, ou objet indexé par nom de compétence ; chaque valeur : { <Rapport>: {...} } ou directement {...}.
       const entries: [string | undefined, any][] = Array.isArray(skills)
         ? skills.map((v) => [undefined, v])
         : skills && typeof skills === 'object'
@@ -117,9 +125,11 @@ export function createMyEpitechService(
           : []
       if (entries.length === 0 && !Array.isArray(skills)) throw new Error(BAD_FORMAT)
       return entries.map(([key, v]): SkillReport => {
-        const r = v?.FullSkillReport ?? v
+        const r = unwrapSkill(v)
         const name = typeof r?.name === 'string' ? r.name : key
-        if (typeof name !== 'string' || !Array.isArray(r?.tests)) throw new Error(BAD_FORMAT)
+        if (typeof name !== 'string') throw new Error(BAD_FORMAT)
+        // Rapport sans liste de tests (ex. BreakdownSkillReport) : on garde les totaux s'ils existent.
+        if (!Array.isArray(r?.tests)) return { name, passed: Number(r?.passed) || 0, count: Number(r?.count) || 0, tests: [] }
         const tests = r.tests.map((t: any) => {
           if (typeof t?.name !== 'string') throw new Error(BAD_FORMAT)
           return { name: t.name, passed: t.passed === true, crashed: t.crashed === true }

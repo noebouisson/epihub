@@ -1,3 +1,4 @@
+import { isIntraProjectUrl } from '../services/intra'
 import { NeedsLoginError } from '../services/types'
 import type { Commit, ProjectDetail, ProjectSummary, PullSummary, RepoActivity, ResultsData, Section, SkillReport, SubjectData, TestRun } from '../../shared/types'
 
@@ -37,7 +38,8 @@ export function createProjectDetails(deps: ProjectDetailsDeps): { get(summary: P
   const loaders = (s: ProjectSummary): { [K in keyof Sections]: () => Promise<Sections[K]> } => {
     const { deadline, repo, lastResult } = s
     return {
-      subject: async () => (deadline ? section<SubjectData>(() => deps.intra.projectDetails(deadline.url)) : unavailable<SubjectData>()),
+      subject: async () =>
+        deadline && isIntraProjectUrl(deadline.url) ? section<SubjectData>(() => deps.intra.projectDetails(deadline.url)) : unavailable<SubjectData>(),
       repo: async () =>
         repo
           ? section<RepoActivity>(async () => {
@@ -46,11 +48,17 @@ export function createProjectDetails(deps: ProjectDetailsDeps): { get(summary: P
             })
           : unavailable<RepoActivity>(),
       results: async () =>
-        lastResult
+        lastResult?.slug
           ? section<ResultsData>(async () => {
               const runs = await deps.myepitech.history(lastResult.module, lastResult.slug)
               const last = runs[runs.length - 1]
-              return { runs, latest: last ? await deps.myepitech.runDetails(last.id) : [] }
+              if (!last) return { runs, latest: [] }
+              // L'historique est la donnée de la section ; le détail du dernier passage est au mieux.
+              try {
+                return { runs, latest: await deps.myepitech.runDetails(last.id) }
+              } catch (err) {
+                return { runs, latest: [], latestError: err instanceof Error ? err.message : String(err) }
+              }
             })
           : unavailable<ResultsData>()
     }

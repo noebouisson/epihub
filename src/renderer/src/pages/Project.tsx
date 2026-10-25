@@ -179,6 +179,7 @@ export function Project({ projectKey: key, settings, repos, open, toast, onSetti
           {results?.state === 'ok' && results.data && (
             <>
               <ScoreChart runs={results.data.runs} />
+              {results.data.latestError && <p className="dim small" title={results.data.latestError}>Détail des tests indisponible</p>}
               <ul className="list">
                 {results.data.latest.map((s) => (
                   <li key={s.name} className="row">
