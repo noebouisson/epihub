@@ -129,3 +129,26 @@ h2 { font-size: 15px; margin: 0; }
 .skill { width: 100%; }
 .skill summary { display: flex; justify-content: space-between; gap: 12px; cursor: pointer; }
 .tests { padding: 6px 0 2px 16px; gap: 2px; }
+
+/* Tableau de bord et rapports */
+.stat-band { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 18px; }
+.stat-band .card { display: flex; flex-direction: column; }
+.stat-next { font-size: 16px; line-height: 28px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.project-card { display: flex; flex-direction: column; gap: 6px; }
+.project-card p { margin: 0; }
+.project-score { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.project-score .big, .report-score .big { margin: 0; }
+.progress-row { display: flex; align-items: center; gap: 10px; }
+.progress { flex: 1; height: 6px; border-radius: 999px; background: var(--bg-hover); overflow: hidden; }
+.progress-bar { height: 100%; background: var(--accent); }
+.report { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.report p { margin: 4px 0; }
+.report h4.sub { margin: 10px 0 4px; }
+.report-score { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.report-table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 6px 0; }
+.report-table th, .report-table td { text-align: left; padding: 4px 8px; border-top: 1px solid var(--border); }
+.report-table th { color: var(--text-dim); font-weight: 600; font-size: 12px; border-top: 0; }
+.report-test summary { cursor: pointer; padding: 4px 0; }
+.report-comment { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; margin: 6px 0; font-size: 12px; white-space: pre-wrap; overflow: auto; max-height: 14em; }
+.report-blockers, .report-advice, .report-working { margin: 4px 0; padding-left: 18px; }
+.link.selected { font-weight: 700; }

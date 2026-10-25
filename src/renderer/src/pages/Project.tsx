@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { ProjectDetail, ProjectSummary, Repo, Section, ServiceId, Settings } from '../../../shared/types';
+import type { ProjectDetail, ProjectSummary, Repo, Report, ReportEntry, Section, ServiceId, Settings } from '../../../shared/types';
 import type { OpenFn } from '../App';
 import { Card } from '../components/Card';
+import { ReportView, VERDICT_BADGE, VERDICT_LABEL } from '../components/ReportView';
 import { RepoPicker } from '../components/RepoPicker';
 import { ScoreChart } from '../components/ScoreChart';
 import { TeamsLinkEditor } from '../components/TeamsLinkEditor';
@@ -14,6 +15,8 @@ const MYEPITECH_HOME = SERVICE_HOMES.myepitech;
 
 interface Props {
   projectKey: string;
+  /** Ancre à faire défiler à l'ouverture (`rapport` : carte Moulinette). */
+  anchor?: string;
   settings: Settings | null;
   repos: Repo[];
   open: OpenFn;
@@ -36,13 +39,42 @@ function SectionBadge({ section, service, open, retry }: { section: Section<unkn
   return null;
 }
 
-export function Project({ projectKey: key, settings, repos, open, toast, onSettings, onBack }: Props): JSX.Element {
+export function Project({ projectKey: key, anchor, settings, repos, open, toast, onSettings, onBack }: Props): JSX.Element {
   const [listSummary, setListSummary] = useState<ProjectSummary | null>(null);
   const [detail, setDetail] = useState<ProjectDetail | null | undefined>(undefined);
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [picking, setPicking] = useState(false);
   const seq = useRef(0);
+  const [entries, setEntries] = useState<ReportEntry[] | null>(null);
+  const [chosen, setChosen] = useState<string | null>(null);
+  const [report, setReport] = useState<Report | null>(null);
+  const [reportFailed, setReportFailed] = useState(false);
+
+  // Liste des rapports : à l'ouverture et quand un nouveau passage arrive.
+  useEffect(() => {
+    let live = true;
+    setEntries(null);
+    setChosen(null);
+    const load = (): void => void window.epihub.reports(key).then((l) => live && setEntries(l)).catch(() => live && setEntries((c) => c ?? []));
+    load();
+    const off = window.epihub.onChanged(load);
+    return () => {
+      live = false;
+      off();
+    };
+  }, [key]);
+
+  const shownId = (chosen && entries?.some((e) => e.runId === chosen) ? chosen : entries?.[0]?.runId) ?? null;
+  useEffect(() => {
+    let live = true;
+    setReport(null);
+    setReportFailed(false);
+    if (shownId) window.epihub.report(shownId).then((r) => live && (r ? setReport(r) : setReportFailed(true))).catch(() => live && setReportFailed(true));
+    return () => {
+      live = false;
+    };
+  }, [shownId]);
 
   // Un appel à l'ouverture, au bouton « Rafraîchir » et après un changement de lien — jamais sur chaque onChanged.
   const load = useCallback((force: boolean): void => {
@@ -68,6 +100,10 @@ export function Project({ projectKey: key, settings, repos, open, toast, onSetti
   }, [key, load]);
 
   const summary = detail?.summary ?? listSummary;
+  const ready = !!summary && entries !== null;
+  useEffect(() => {
+    if (ready && anchor) document.getElementById(anchor)?.scrollIntoView({ block: 'start' });
+  }, [ready, anchor]);
   // Sans force : les sections en échec ne sont pas en cache et un changement de lien change la signature.
   const afterLinkChange = (s: Settings): void => {
     onSettings(s);
@@ -103,6 +139,15 @@ export function Project({ projectKey: key, settings, repos, open, toast, onSetti
   const subject = detail?.subject;
   const repo = detail?.repo;
   const results = detail?.results;
+  const shownEntry = entries?.find((e) => e.runId === shownId) ?? null;
+  const openFile = async (): Promise<void> => {
+    if (shownId) toast((await window.epihub.openReportFile(shownId).catch(() => false)) ? 'Rapport ouvert' : 'Fichier introuvable');
+  };
+  const exportPdf = async (): Promise<void> => {
+    if (!shownId) return;
+    const path = await window.epihub.exportReportPdf(shownId).catch(() => null);
+    toast(path ? `PDF exporté : ${path}` : "L'export PDF n'a pas abouti");
+  };
 
   return (
     <div className="page">
@@ -186,34 +231,44 @@ export function Project({ projectKey: key, settings, repos, open, toast, onSetti
           )}
         </Card>
 
-        <Card title="My Epitech" wide badge={<SectionBadge section={results} service="myepitech" open={open} retry={retry} />}>
-          {results?.state === 'unavailable' && <p className="dim">Aucun résultat My Epitech</p>}
-          {results?.state === 'ok' && results.data && (
-            <>
-              <ScoreChart runs={results.data.runs} />
-              {results.data.latestError && <p className="dim small" title={results.data.latestError}>Détail des tests indisponible</p>}
-              <ul className="list">
-                {results.data.latest.map((s) => (
-                  <li key={s.name} className="row">
-                    <details className="skill">
-                      <summary>
-                        <span>{s.name}</span>
-                        <strong className={s.passed === s.count ? 'ok' : 'bad'}>{s.passed}/{s.count}</strong>
-                      </summary>
-                      <ul className="list tests">
-                        {s.tests.map((t) => (
-                          <li key={t.name} className="small">
-                            {t.crashed ? <span className="bad">crash</span> : t.passed ? <span className="ok">✓</span> : <span className="bad">✗</span>} {t.name}
-                          </li>
-                        ))}
-                      </ul>
-                    </details>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-        </Card>
+        <section id="rapport" className="card card-wide">
+          <header className="card-head">
+            <h2>Moulinette</h2>
+            <SectionBadge section={results} service="myepitech" open={open} retry={retry} />
+          </header>
+          <div className="card-body">
+            {results?.state === 'ok' && results.data && <ScoreChart runs={results.data.runs} />}
+            {entries === null ? (
+              <p className="dim">Chargement…</p>
+            ) : entries.length === 0 ? (
+              <p className="dim">Pas encore de rapport — il sera généré au prochain passage de la moulinette</p>
+            ) : (
+              <>
+                <div className="form-row wrap">
+                  <button type="button" className="btn btn-small" disabled={!shownEntry?.file} onClick={() => void openFile()}>Ouvrir le fichier</button>
+                  <button type="button" className="btn btn-small" onClick={() => void exportPdf()}>Exporter en PDF</button>
+                </div>
+                {report ? <ReportView report={report} /> : <p className="dim">{reportFailed ? 'Rapport indisponible' : 'Chargement…'}</p>}
+                {entries.length > 1 && (
+                  <>
+                    <h3 className="sub">Rapports précédents</h3>
+                    <ul className="list">
+                      {entries.map((e) => (
+                        <li key={e.runId} className="row">
+                          <button type="button" className={`link${e.runId === shownId ? ' selected' : ''}`} aria-current={e.runId === shownId} onClick={() => setChosen(e.runId)}>
+                            {new Date(e.date).toLocaleString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </button>
+                          <strong>{e.score === null ? '—' : `${e.score} %`}</strong>
+                          <span className={`badge ${VERDICT_BADGE[e.verdict]}`}>{VERDICT_LABEL[e.verdict]}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        </section>
 
         <Card title="Teams" wide>
           <TeamsLinkEditor

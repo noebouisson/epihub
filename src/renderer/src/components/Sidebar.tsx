@@ -24,6 +24,7 @@ export function Sidebar({ view, snapshot, onSelect }: Props): JSX.Element {
         <span className="brand-mark">E</span>
         <span className="brand-name">EpiHub</span>
       </div>
+      {item('dashboard', '📈', 'Tableau de bord')}
       {item('home', '⌂', 'Accueil')}
       {item('projects', '📁', 'Projets')}
       {SERVICES.map((s) => {

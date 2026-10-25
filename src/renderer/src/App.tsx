@@ -4,6 +4,7 @@ import type { OpenTarget, ServiceId, ServiceSnapshot, Settings } from '../../sha
 import { CommandPalette } from './components/CommandPalette';
 import { ServiceView, type OpenRequest } from './components/ServiceView';
 import { Sidebar } from './components/Sidebar';
+import { Dashboard } from './pages/Dashboard';
 import { Home } from './pages/Home';
 import { Project } from './pages/Project';
 import { Projects } from './pages/Projects';
@@ -14,14 +15,17 @@ import './styles/app.css';
 export type Snapshot = { [K in ServiceId]: ServiceSnapshot<K> };
 export type OpenFn = (service: ServiceId | 'app', url?: string) => void;
 
+const PROJECT_PREFIX = 'project:';
+
 export function App(): JSX.Element {
-  const [view, setView] = useState<View>('home');
+  const [view, setView] = useState<View>('dashboard');
   // Teams est monté (caché) dès le lancement : non-lus et notifications disponibles sans ouvrir l'onglet.
   const [mounted, setMounted] = useState<Set<ServiceId>>(() => new Set<ServiceId>(['teams']));
   const [requests, setRequests] = useState<Partial<Record<ServiceId, OpenRequest>>>({});
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [projectKey, setProjectKey] = useState<string | null>(null);
+  const [anchor, setAnchor] = useState<string | undefined>(undefined);
   const [toast, setToast] = useState<string | null>(null);
 
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -35,7 +39,7 @@ export function App(): JSX.Element {
   const select = useCallback((v: View) => {
     setView(v);
     if (v === 'projects') setProjectKey(null);
-    if (v !== 'home' && v !== 'projects' && v !== 'settings') setMounted((m) => (m.has(v) ? m : new Set(m).add(v)));
+    if (v !== 'dashboard' && v !== 'home' && v !== 'projects' && v !== 'settings') setMounted((m) => (m.has(v) ? m : new Set(m).add(v)));
   }, []);
 
   const open: OpenFn = useCallback(
@@ -47,8 +51,9 @@ export function App(): JSX.Element {
     [select]
   );
 
-  const openProject = useCallback((key: string) => {
+  const openProject = useCallback((key: string, to?: string) => {
     setProjectKey(key);
+    setAnchor(to);
     setView('projects');
   }, []);
 
@@ -56,12 +61,16 @@ export function App(): JSX.Element {
     void window.epihub.snapshot().then(setSnapshot);
     void window.epihub.getSettings().then(setSettings);
     const offChanged = window.epihub.onChanged(setSnapshot);
-    const offOpen = window.epihub.onOpen((t: OpenTarget) => open(t.service, t.url));
+    const offOpen = window.epihub.onOpen((t: OpenTarget) => {
+      // Notification de rapport : page du projet, sur la carte Moulinette.
+      if (t.service === 'app' && t.url?.startsWith(PROJECT_PREFIX) && t.url.length > PROJECT_PREFIX.length) openProject(t.url.slice(PROJECT_PREFIX.length), 'rapport');
+      else open(t.service, t.url);
+    });
     return () => {
       offChanged();
       offOpen();
     };
-  }, [open]);
+  }, [open, openProject]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = settings?.theme ?? 'dark';
@@ -71,11 +80,12 @@ export function App(): JSX.Element {
     <div className="app">
       <Sidebar view={view} snapshot={snapshot} onSelect={select} />
       <main className="content">
+        {view === 'dashboard' && <Dashboard snapshot={snapshot} open={open} openProject={openProject} />}
         {view === 'home' && <Home snapshot={snapshot} settings={settings} onSettings={setSettings} open={open} openProject={openProject} setView={select} toast={showToast} />}
         {view === 'projects' && (projectKey === null ? (
           <Projects snapshot={snapshot} open={open} openProject={openProject} />
         ) : (
-          <Project key={projectKey} projectKey={projectKey} settings={settings} repos={snapshot?.github.data?.repos ?? []} open={open} toast={showToast} onSettings={setSettings} onBack={() => setProjectKey(null)} />
+          <Project key={projectKey} projectKey={projectKey} anchor={anchor} settings={settings} repos={snapshot?.github.data?.repos ?? []} open={open} toast={showToast} onSettings={setSettings} onBack={() => setProjectKey(null)} />
         ))}
         {view === 'settings' && <SettingsPage snapshot={snapshot} settings={settings} onSettings={setSettings} open={open} />}
         {SERVICES.filter((s) => mounted.has(s.id)).map((s) => (

@@ -71,7 +71,7 @@ export function Settings({ snapshot, settings, onSettings, open }: Props): JSX.E
                       <strong>{s.label}</strong> <span className={`badge ${st === 'ok' ? 'badge-ok' : st === 'error' ? 'badge-danger' : 'badge-dim'}`}>{STATE_LABEL[st]}</span>
                     </div>
                     <button type="button" className="btn btn-small" onClick={() => open(s.id)}>Se reconnecter</button>
-                    {settings && (
+                    {settings && s.id !== 'intra' && (
                       <label className="switch" title="Notifications">
                         <input type="checkbox" checked={settings.notify[s.id]} onChange={(e) => void update({ notify: { ...settings.notify, [s.id as ServiceId]: e.target.checked } })} />
                         <span>Notifications</span>

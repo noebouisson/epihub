@@ -130,6 +130,7 @@ export function Home({ snapshot, settings, onSettings, open, openProject, setVie
               <div><span className="big">{profile.promotion ?? '—'}</span><span className="dim small">promo</span></div>
               <div><span className="big">{profile.semester ?? '—'}</span><span className="dim small">semestre</span></div>
               <div><span className="big">{profile.gpa ?? '—'}</span><span className="dim small">GPA</span></div>
+              {profile.cursus && <div><span className="big">{profile.cursus}</span><span className="dim small">cursus</span></div>}
             </div>
           )}
         </Card>
