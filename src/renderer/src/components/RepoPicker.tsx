@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { findProject, linkPatch, projectKey, resolveLink } from '../../../shared/projects';
 import type { DeadlineView, Repo, Settings } from '../../../shared/types';
 
 interface Props {
@@ -34,7 +35,12 @@ export function RepoPicker({ deadline, title, current, onSelect, repos, settings
     const links = { ...settings.repoLinks };
     if (fullName === null) delete links[deadline.id];
     else links[deadline.id] = fullName;
-    onSaved(await window.epihub.updateSettings({ repoLinks: links }));
+    const patch: Partial<Settings> = { repoLinks: links };
+    // Un repo lié sur la page projet est prioritaire : on le met à jour aussi (sous chaque alias) pour que ce choix s'applique.
+    const intraKey = projectKey(deadline.moduleCode, deadline.title);
+    const project = findProject(await window.epihub.projects().catch(() => []), intraKey) ?? { key: intraKey, aliases: [] };
+    if (resolveLink(settings.projectRepoLinks, project) !== null) patch.projectRepoLinks = linkPatch(settings.projectRepoLinks, project, fullName);
+    onSaved(await window.epihub.updateSettings(patch));
     onClose();
   };
 

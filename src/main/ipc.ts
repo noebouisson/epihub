@@ -4,6 +4,7 @@ import { clip, TEAMS_DEDUP_TTL, teamsKey } from './app/effects'
 import { buildSearchItems, search } from './links/searchIndex'
 import { shareText } from './links/shareText'
 import { isTrustedSender } from './securityPolicy'
+import { sanitizeSettingsPatch } from './store/settings'
 
 const SERVICE_IDS: readonly ServiceId[] = ['github', 'intra', 'myepitech', 'teams']
 const isServiceId = (v: unknown): v is ServiceId => SERVICE_IDS.includes(v as ServiceId)
@@ -51,8 +52,8 @@ export function registerIpc(deps: IpcDeps): void {
   )
   handle('epihub:teamsPreloadPath', () => deps.teamsPreloadPath)
   handle('epihub:settings:get', () => deps.settings.get())
-  handle('epihub:settings:update', (_e, patch: Partial<Settings>) => {
-    const next = deps.settings.update(patch ?? {})
+  handle('epihub:settings:update', (_e, patch: unknown) => {
+    const next = deps.settings.update(sanitizeSettingsPatch(patch))
     deps.projects.invalidate()
     return next
   })

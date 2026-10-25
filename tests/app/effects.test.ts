@@ -1,5 +1,6 @@
 import { describe, expect, test, vi } from 'vitest'
 import { clip, createEffects, TEAMS_DEDUP_TTL, teamsKey } from '../../src/main/app/effects'
+import { projectKey } from '../../src/shared/projects'
 import type { Commit, ServiceId, Settings } from '../../src/shared/types'
 
 const NOW = Date.parse('2026-01-10T12:00:00Z')
@@ -10,7 +11,7 @@ const intra = { login: '', promo: 0, credits: 0, gpa: '', deadlines: [deadline],
 const github = { login: '', notifications: [{ id: 'g1', title: 'PR', repo: 'me/x', type: 'PullRequest', url: 'http://g/1', updatedAt: new Date(NOW - 3600e3).toISOString() }], reviewRequests: [], assignedIssues: [], repos: [repo] }
 
 type LastCommit = (f: string, b: string) => Promise<Commit | null>
-function setup(lastCommit = vi.fn<LastCommit>(async () => null), primed: ServiceId[] = ['github', 'intra']) {
+function setup(lastCommit = vi.fn<LastCommit>(async () => null), primed: ServiceId[] = ['github', 'intra'], conf: Settings = settings) {
   const marks = new Set<ServiceId>(primed)
   const hub = {
     prime: vi.fn((_k: string[], s?: ServiceId) => { if (s) marks.add(s) }),
@@ -18,7 +19,7 @@ function setup(lastCommit = vi.fn<LastCommit>(async () => null), primed: Service
     push: vi.fn((_k: string, _s: ServiceId, _t: string, _b: string, _u?: string) => true)
   }
   let now = NOW
-  const fx = createEffects({ lastCommit, settings: () => settings, hub, now: () => now })
+  const fx = createEffects({ lastCommit, settings: () => conf, hub, now: () => now })
   return { fx, hub, lastCommit, advance: (ms: number) => { now += ms } }
 }
 
@@ -47,6 +48,18 @@ describe('effets après rafraîchissement', () => {
     const views = await fx.deadlines({ github, intra })
     expect(views).toHaveLength(1)
     expect(views[0]!.lastCommit).toBeNull()
+  })
+
+  test('repo lié sur la page projet prioritaire sur le lien du rendu et l’automatique', async () => {
+    const other = { ...repo, fullName: 'me/other', name: 'other' }
+    const old = { ...repo, fullName: 'me/old', name: 'old' }
+    const gh = { ...github, repos: [repo, other, old] }
+    const key = projectKey('B-CPE-200', 'mypoc')
+    const run = async (links: Partial<Settings>): Promise<string | undefined> =>
+      (await setup(undefined, undefined, { ...settings, ...links }).fx.deadlines({ github: gh, intra }))[0]!.repo?.fullName
+    expect(await run({ projectRepoLinks: { [key]: 'me/other' }, repoLinks: { d1: 'me/old' } })).toBe('me/other')
+    expect(await run({ projectRepoLinks: { [key]: 'me/gone' }, repoLinks: { d1: 'me/old' } })).toBe('me/old')
+    expect(await run({ projectRepoLinks: { [key]: 'me/gone' } })).toBe(repo.fullName)
   })
 
   test('sans données intra, aucune vue', async () => {

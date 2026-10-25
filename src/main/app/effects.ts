@@ -1,4 +1,5 @@
-import type { Commit, DeadlineView, Repo, ServiceDataMap, ServiceId, Settings } from '../../shared/types'
+import { projectKey } from '../../shared/projects'
+import type { Commit, Deadline, DeadlineView, Repo, ServiceDataMap, ServiceId, Settings } from '../../shared/types'
 import { alertKey, buildDeadlineViews } from '../links/deadlineAlerts'
 
 const COMMIT_TTL = 5 * 60_000
@@ -26,6 +27,19 @@ export const clip = (s: unknown, max = MAX_TEXT): string => String(s ?? '').slic
 /** Clé de déduplication d'une notification Teams (la charge utile vient de la page : à plafonner). */
 export function teamsKey(title: string, body: string, tag: string): string {
   return `teams:${tag}|${title}|${body}`
+}
+
+/**
+ * Lien manuel par échéance : repo lié sur la page projet (clé intranet, s'il existe encore),
+ * sinon lien posé sur le rendu ; l'association automatique reste le dernier recours.
+ */
+export function deadlineRepoLinks(deadlines: Deadline[], repos: Repo[], settings: Pick<Settings, 'repoLinks' | 'projectRepoLinks'>): Record<string, string> {
+  const links: Record<string, string> = { ...settings.repoLinks }
+  for (const d of deadlines) {
+    const linked = settings.projectRepoLinks[projectKey(d.moduleCode, d.title)]
+    if (linked && repos.some((r) => r.fullName === linked)) links[d.id] = linked
+  }
+  return links
 }
 
 export function createEffects(deps: EffectsDeps) {
@@ -58,7 +72,7 @@ export function createEffects(deps: EffectsDeps) {
     const intra = data.intra
     if (!intra) return []
     const repos = data.github?.repos ?? []
-    const manual = settingsLinks()
+    const manual = deadlineRepoLinks(intra.deadlines, repos, deps.settings())
     const now = new Date(deps.now())
     const first = buildDeadlineViews(intra.deadlines, repos, {}, manual, now)
     const linked = new Map<string, Repo>()
@@ -67,8 +81,6 @@ export function createEffects(deps: EffectsDeps) {
     await Promise.all([...linked.values()].map(async (r) => { fetched[r.fullName] = await commitFor(r) }))
     return buildDeadlineViews(intra.deadlines, repos, fetched, manual, now)
   }
-
-  const settingsLinks = (): Record<string, string> => deps.settings().repoLinks
 
   return {
     deadlines,

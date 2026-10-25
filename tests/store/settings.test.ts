@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { beforeEach, expect, test } from 'vitest';
-import { createSettingsStore } from '../../src/main/store/settings';
+import { createSettingsStore, sanitizeSettingsPatch } from '../../src/main/store/settings';
 
 let tmp: string;
 beforeEach(() => {
@@ -29,4 +29,13 @@ test('nouveaux réglages par défaut', () => {
 test('un ancien fichier sans les nouveaux champs les reçoit', () => {
   const p = join(tmp, 'settings.json'); writeFileSync(p, JSON.stringify({ repoLinks: { a: 'me/r' } }));
   expect(createSettingsStore(p).get().projectTeamsLinks).toEqual({});
+});
+test('patch : liens Teams invalides et liens repo non chaîne retirés', () => {
+  const ok = 'https://teams.microsoft.com/l/chat/x';
+  const patch = { theme: 'light', projectTeamsLinks: { 'A/a': ok, 'A/b': 'https://evil.com/x', 'A/c': 42 }, projectRepoLinks: { 'A/a': 'octocat/a', 'A/b': 7, 'A/c': null } } as unknown;
+  expect(sanitizeSettingsPatch(patch)).toEqual({ theme: 'light', projectTeamsLinks: { 'A/a': ok }, projectRepoLinks: { 'A/a': 'octocat/a' } });
+});
+test('patch : tables non objet ignorées, patch absent → {}', () => {
+  expect(sanitizeSettingsPatch({ projectTeamsLinks: 'x', projectRepoLinks: ['a'] })).toEqual({});
+  expect(sanitizeSettingsPatch(null)).toEqual({});
 });
