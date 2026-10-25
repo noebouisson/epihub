@@ -66,22 +66,45 @@ test('détail précédent en erreur : rapport généré quand même', async () =
   expect(store.has('9001')).toBe(true)
 })
 
-test('détail en erreur → rien d’indexé, réessayé ensuite, sans initialiser', async () => {
-  const { pipe, runDetail, store } = setup(true)
+test('détail en erreur → rien d’indexé, réessayé ensuite', async () => {
+  const { pipe, runDetail, store } = setup()
   runDetail.mockRejectedValueOnce(new Error('x'))
   await pipe.process(data)
   expect(store.has('9001')).toBe(false)
-  expect(store.isInitialized()).toBe(false)
   await pipe.process(data)
   expect(store.has('9001')).toBe(true)
 })
 
+const two = (): MyEpitechData => ({ ...data, projects: [project, { ...project, id: 'p2', name: 'Autre' }], runs: { ...data.runs, p2: [sum({ id: '9100', title: 'Autre', categories: { a: cat(10, 5) } })] } })
+
+test('premier lancement avec un projet en échec : initialisé, nouveau passage ailleurs notifié, passage en échec jamais notifié', async () => {
+  const { pipe, runDetail, store, notify } = setup(true)
+  runDetail.mockImplementation(async (id: string) => { if (id === '9001') throw new Error('x'); return det() })
+  await pipe.process(two())
+  expect(store.isInitialized()).toBe(true)
+  expect(store.has('9100')).toBe(true)
+  expect(notify).not.toHaveBeenCalled()
+  // nouveau passage sur le projet 2
+  const next = two()
+  next.runs['p2'] = [sum({ id: '9101', title: 'Autre', categories: { a: cat(10, 8) } }), ...next.runs['p2']]
+  runDetail.mockImplementation(async () => det())
+  await pipe.process(next)
+  expect(store.has('9001')).toBe(true)
+  expect(notify).toHaveBeenCalledTimes(1)
+  expect(notify.mock.calls[0][3]).toBe('9101')
+  expect(createReportStore(dir).isSilent('9001')).toBe(false)
+})
+
+test('premier process sans aucun passage : reste non initialisé', async () => {
+  const { pipe, store } = setup(true)
+  await pipe.process({ ...data, runs: {} })
+  expect(store.isInitialized()).toBe(false)
+})
+
 test('une erreur sur un projet n’arrête pas les autres', async () => {
   const { pipe, runDetail, store } = setup()
-  const p2: MyProject = { ...project, id: 'p2', name: 'Autre' }
-  const two: MyEpitechData = { ...data, projects: [project, p2], runs: { ...data.runs, p2: [sum({ id: '9100', title: 'Autre' })] } }
   runDetail.mockImplementation(async (id: string) => { if (id === '9001') throw new Error('x'); return det() })
-  await pipe.process(two)
+  await pipe.process(two())
   expect(store.has('9001')).toBe(false)
   expect(store.has('9100')).toBe(true)
 })
@@ -119,4 +142,5 @@ test('isInsideDir', () => {
   expect(isInsideDir('/d/r/a.md', '/d/r')).toBe(true)
   expect(isInsideDir('/d/r/../x.md', '/d/r')).toBe(false)
   expect(isInsideDir('/d/rapports2/a.md', '/d/rapports')).toBe(false)
+  expect(isInsideDir('/d/r/..foo/a.md', '/d/r')).toBe(true)
 })

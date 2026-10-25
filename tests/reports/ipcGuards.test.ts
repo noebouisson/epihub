@@ -7,6 +7,8 @@ test('isInsideDir : refuse sortie de dossier, dossier voisin et dossier lui-mêm
   expect(isInsideDir('/d/r/../x.md', '/d/r')).toBe(false)
   expect(isInsideDir('/d/rapports2/a.md', '/d/rapports')).toBe(false)
   expect(isInsideDir('/d/r', '/d/r')).toBe(false)
+  expect(isInsideDir('/d/r/..foo/a.md', '/d/r')).toBe(true)
+  expect(isInsideDir('/d/r/../x', '/d/r')).toBe(false)
 })
 
 test('validRunId', () => {

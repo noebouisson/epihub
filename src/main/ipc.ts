@@ -119,6 +119,7 @@ export function registerIpc(deps: IpcDeps): void {
     const report = deps.reports.store.report(runId)
     if (!report) return null
     const out = pdfPathFor(report, deps.reports.dir)
+    if (!isInsideDir(out, deps.reports.dir)) return null
     await mkdir(dirname(out), { recursive: true })
     await deps.reports.exportPdf(report, out)
     deps.reports.showItemInFolder(out)

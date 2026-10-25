@@ -1,11 +1,11 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Report, ReportEntry } from '../../shared/types'
 
 /** Un identifiant de passage ne contient que des chiffres (il sert aussi de nom de fichier). */
 export const validRunId = (v: unknown): v is string => typeof v === 'string' && /^\d+$/.test(v)
 
-interface Index { initialized: boolean; entries: Record<string, ReportEntry> }
+interface Index { initialized: boolean; entries: Record<string, ReportEntry>; /** Passages du lot initial dont la génération a échoué : jamais notifiés. */ silent: string[] }
 
 const isEntry = (e: unknown): e is ReportEntry =>
   !!e && typeof e === 'object' && validRunId((e as ReportEntry).runId) && typeof (e as ReportEntry).projectKey === 'string' && typeof (e as ReportEntry).date === 'string'
@@ -18,6 +18,9 @@ export interface ReportStore {
   report(runId: string): Report | null
   isInitialized(): boolean
   markInitialized(): void
+  isSilent(runId: string): boolean
+  markSilent(runId: string): void
+  clearSilent(runId: string): void
 }
 
 /** Index `<dir>/reports.json` et rapports `<dir>/reports/<runId>.json` (dir = userData). */
@@ -30,15 +33,23 @@ export function createReportStore(dir: string): ReportStore {
       const raw = JSON.parse(readFileSync(indexPath, 'utf8')) as Partial<Index>
       const entries: Record<string, ReportEntry> = {}
       for (const [k, e] of Object.entries(raw.entries ?? {})) if (isEntry(e) && e.runId === k) entries[k] = e
-      return { initialized: raw.initialized === true, entries }
+      const silent = Array.isArray(raw.silent) ? raw.silent.filter(validRunId) : []
+      return { initialized: raw.initialized === true, entries, silent }
     } catch {
-      return { initialized: false, entries: {} }
+      return { initialized: false, entries: {}, silent: [] }
     }
   }
   let index = load()
-  const persist = (): void => {
+  /** Écriture atomique : fichier temporaire puis renommage. */
+  const atomicWrite = (file: string, data: string): void => {
+    writeFileSync(`${file}.tmp`, data, { mode: 0o600 })
+    renameSync(`${file}.tmp`, file)
+  }
+  /** L'index en mémoire n'est remplacé qu'une fois l'écriture réussie. */
+  const commit = (next: Index): void => {
     mkdirSync(dir, { recursive: true })
-    writeFileSync(indexPath, JSON.stringify(index), { mode: 0o600 })
+    atomicWrite(indexPath, JSON.stringify(next))
+    index = next
   }
 
   return {
@@ -48,9 +59,8 @@ export function createReportStore(dir: string): ReportStore {
     save(entry, report) {
       if (!validRunId(entry.runId)) throw new Error('runId invalide')
       mkdirSync(reportsDir, { recursive: true })
-      writeFileSync(join(reportsDir, `${entry.runId}.json`), JSON.stringify(report), { mode: 0o600 })
-      index = { ...index, entries: { ...index.entries, [entry.runId]: entry } }
-      persist()
+      atomicWrite(join(reportsDir, `${entry.runId}.json`), JSON.stringify(report))
+      commit({ ...index, entries: { ...index.entries, [entry.runId]: entry } })
     },
     report(runId) {
       if (!validRunId(runId)) return null
@@ -62,8 +72,14 @@ export function createReportStore(dir: string): ReportStore {
     },
     isInitialized: () => index.initialized,
     markInitialized() {
-      index = { ...index, initialized: true }
-      persist()
+      commit({ ...index, initialized: true })
+    },
+    isSilent: (runId) => index.silent.includes(runId),
+    markSilent(runId) {
+      if (validRunId(runId) && !index.silent.includes(runId)) commit({ ...index, silent: [...index.silent, runId] })
+    },
+    clearSilent(runId) {
+      if (index.silent.includes(runId)) commit({ ...index, silent: index.silent.filter((r) => r !== runId) })
     }
   }
 }

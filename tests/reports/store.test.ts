@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, expect, test } from 'vitest'
@@ -47,4 +47,13 @@ test('runId non numérique refusé', () => {
   expect(validRunId('12')).toBe(true)
   expect(() => createReportStore(dir).save(entry('../1', '2026-10-01'), rep())).toThrow()
   expect(createReportStore(dir).report('../1')).toBeNull()
+})
+
+test('silent : persisté, retiré, et aucun .tmp laissé', () => {
+  const s = createReportStore(dir)
+  s.markSilent('5')
+  expect(createReportStore(dir).isSilent('5')).toBe(true)
+  s.clearSilent('5')
+  expect(createReportStore(dir).isSilent('5')).toBe(false)
+  expect(readdirSync(dir).filter((f) => f.endsWith('.tmp'))).toEqual([])
 })
