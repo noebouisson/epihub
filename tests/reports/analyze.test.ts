@@ -4,6 +4,11 @@ import { buildReport } from '../../src/main/reports/analyze'
 import { cat, det, sum, test_ } from './helpers'
 
 test('score : somme des catégories', () => expect(scoreOf({ a: cat(10, 7), b: cat(10, 3) })).toBe(50))
+test('score : plafonné à 99 tant qu’un test échoue', () => {
+  expect(scoreOf({ a: cat(1000, 995) })).toBe(99)
+  expect(scoreOf({ a: cat(1000, 1000) })).toBe(100)
+  expect(scoreOf({ a: cat(200, 199) })).toBe(99)
+})
 test('score : aucun test → null', () => expect(scoreOf({})).toBeNull())
 test('score : catégories à zéro test → null', () => expect(scoreOf({ a: cat(0, 0) })).toBeNull())
 test('verdict réussi', () => expect(verdictOf(sum({ categories: { a: cat(5, 5) } }), det())).toBe('reussi'))

@@ -10,7 +10,8 @@ interface Props {
   /** Passage précédent, pour la flèche Δ. */
   previous: RunSummary | null;
   now: Date;
-  onOpen(key: string): void;
+  /** `anchor` : `rapport` (carte Moulinette) seulement s'il existe un passage. */
+  onOpen(key: string, anchor?: string): void;
 }
 
 export function ProjectCard({ project: p, start, previous, now, onOpen }: Props): JSX.Element {
@@ -46,7 +47,11 @@ export function ProjectCard({ project: p, start, previous, now, onOpen }: Props)
         </>
       )}
       <div className="form-row">
-        <button type="button" className="btn btn-small" onClick={() => onOpen(p.key)}>Voir le rapport</button>
+        {last ? (
+          <button type="button" className="btn btn-small" onClick={() => onOpen(p.key, 'rapport')}>Voir le rapport</button>
+        ) : (
+          <button type="button" className="btn btn-small" onClick={() => onOpen(p.key)}>Voir le projet</button>
+        )}
       </div>
     </section>
   );

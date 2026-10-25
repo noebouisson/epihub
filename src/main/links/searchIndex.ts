@@ -8,6 +8,7 @@ type Snapshot = Partial<{ [K in ServiceId]: ServiceDataMap[K] | null }>
 interface Indexed { item: SearchItem; codes: string }
 
 const PAGES: SearchItem[] = [
+  { id: 'page:dashboard', kind: 'page', title: 'Tableau de bord', service: 'app', url: '' },
   { id: 'page:home', kind: 'page', title: 'Accueil', service: 'app', url: '' },
   { id: 'page:github', kind: 'page', title: 'GitHub', service: 'github', url: '' },
   { id: 'page:intra', kind: 'page', title: 'Intranet', service: 'intra', url: '' },
@@ -18,7 +19,8 @@ const PAGES: SearchItem[] = [
 
 const squash = (s: string): string => s.toLowerCase().replace(/[-_\s]+/g, '')
 
-export function buildSearchItems(snap: Snapshot, projects: ProjectSummary[] = []): SearchItem[] {
+/** `now` : seuls les projets dont la fin est dans le futur sont des rendus ; les autres restent trouvables comme `project:`. */
+export function buildSearchItems(snap: Snapshot, projects: ProjectSummary[] = [], now: number = Date.now()): SearchItem[] {
   const out: SearchItem[] = [...PAGES]
   const seen = new Set(out.map((i) => i.id))
   const add = (item: SearchItem): void => {
@@ -34,8 +36,10 @@ export function buildSearchItems(snap: Snapshot, projects: ProjectSummary[] = []
     gh.reviewRequests.forEach(ghItem)
     gh.assignedIssues.forEach(ghItem)
   }
-  for (const p of snap.myepitech?.projects ?? [])
+  for (const p of snap.myepitech?.projects ?? []) {
+    if (!(Date.parse(p.end) > now)) continue
     add({ id: `deadline:mye-${p.id}`, kind: 'deadline', title: p.name, subtitle: `${p.unitCode} · ${normalize(p.name)}`, service: 'myepitech', url: p.url, date: p.end })
+  }
   for (const p of projects) add({ id: `project:${p.key}`, kind: 'project', title: p.title, subtitle: p.moduleCode, service: 'app', url: '' })
   return out
 }

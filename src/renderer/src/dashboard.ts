@@ -1,5 +1,6 @@
 import { scoreOf, verdictOf } from '../../shared/score';
-import type { ProjectSummary, RunSummary } from '../../shared/types';
+import { projectKey } from '../../shared/projects';
+import type { MyEpitechData, ProjectSummary, RunSummary } from '../../shared/types';
 
 const DAY = 86_400_000;
 
@@ -70,4 +71,23 @@ export function dashboardSummary(projects: ProjectSummary[], now: Date): { inPro
     average: scores.length === 0 ? null : Math.round(scores.reduce((a, b) => a + b, 0) / scores.length),
     next: upcoming[0] ?? null
   };
+}
+
+/**
+ * Derniers passages (un par projet, du plus récent au plus ancien) avec la clé canonique du projet
+ * (`projectKey(unité, nom)`, via l'id du projet) ; repli sur le code du passage si le projet est inconnu.
+ */
+export function latestResults(data: MyEpitechData | null | undefined, limit: number): { run: RunSummary; key: string }[] {
+  if (!data) return [];
+  const byId = new Map(data.projects.map((p) => [p.id, p]));
+  return Object.entries(data.runs)
+    .map(([id, runs]) => {
+      const run = runs[0];
+      if (!run) return null;
+      const p = byId.get(id);
+      return { run, key: p ? projectKey(p.unitCode, p.name) : projectKey(run.unitCode, run.projectCode) };
+    })
+    .filter((x): x is { run: RunSummary; key: string } => x !== null)
+    .sort((a, b) => Date.parse(b.run.date) - Date.parse(a.run.date))
+    .slice(0, limit);
 }

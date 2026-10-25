@@ -1,11 +1,13 @@
 import type { RunDetail, RunSummary, SkillBreakdown, Verdict } from './types'
 
-/** Σ passed / Σ count des catégories, en % arrondi ; null sans test. */
+/** Σ passed / Σ count des catégories, en % arrondi ; null sans test. Plafonné à 99 tant qu'un test échoue (995/1000 ≠ 100 %). */
 export function scoreOf(categories: Record<string, SkillBreakdown>): number | null {
   let count = 0
   let passed = 0
   for (const c of Object.values(categories)) { count += c.count; passed += c.passed }
-  return count === 0 ? null : Math.round((passed / count) * 100)
+  if (count === 0) return null
+  const rounded = Math.round((passed / count) * 100)
+  return passed < count ? Math.min(99, rounded) : rounded
 }
 
 /** Tous les tests passent (exact, sans arrondi) et il y en a au moins un. */

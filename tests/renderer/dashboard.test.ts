@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
-import { dashboardSummary, mainProblem, progressOf, sortProjects } from '../../src/renderer/src/dashboard';
-import type { DeadlineView, ProjectSummary, RunSummary, SkillBreakdown } from '../../src/shared/types';
+import { dashboardSummary, latestResults, mainProblem, progressOf, sortProjects } from '../../src/renderer/src/dashboard';
+import type { DeadlineView, MyEpitechData, MyProject, ProjectSummary, RunSummary, SkillBreakdown } from '../../src/shared/types';
 
 const now = new Date('2026-10-16T12:00:00');
 
@@ -67,4 +67,20 @@ test('tri : en cours par échéance, puis terminés par dernier passage', () => 
   const recent = project('recent', 'termine', null, run({ date: '2026-10-10T00:00:00Z', categories: { a: cat(1, 1) } }));
   const noEnd = project('noend', 'en-cours', null, null);
   expect(sortProjects([old, noEnd, enCoursOk, recent, enCoursEchoue]).map((p) => p.key)).toEqual(['b', 'a', 'noend', 'recent', 'old']);
+});
+
+test('derniers résultats : ouverts par la clé canonique du projet (pas le code du passage)', () => {
+  const p = (id: string, name: string): MyProject => ({ id, name, unitCode: 'G-CPE-101', unitName: '', description: '', start: '', end: '', url: '' });
+  const data: MyEpitechData = {
+    profile: { login: 'jane.doe@epitech.eu', name: '', promotion: null, semester: null, gpa: null, cursus: null },
+    projects: [p('1', 'My printf'), p('2', 'Bistro-matic')],
+    runs: {
+      '1': [run({ id: '11', unitCode: 'G-CPE-101', projectCode: 'cpe-myprintf', date: '2026-10-15T10:00:00Z' })],
+      '2': [run({ id: '21', date: '2026-10-16T10:00:00Z' })],
+      '3': [run({ id: '31', date: '2026-10-14T10:00:00Z' })]
+    }
+  };
+  const r = latestResults(data, 5);
+  expect(r.map((x) => [x.run.id, x.key])).toEqual([['21', 'G-CPE-101/bistromatic'], ['11', 'G-CPE-101/myprintf'], ['31', 'B-CPE-100/cpe100']]);
+  expect(latestResults(data, 1)).toHaveLength(1);
 });

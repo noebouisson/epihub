@@ -48,7 +48,7 @@ export function Dashboard({ snapshot, open, openProject }: Props): JSX.Element {
         {sorted.map((p) => {
           const runs = (p.projectId && mye?.data?.runs[p.projectId]) || [];
           const start = (p.projectId && mye?.data?.projects.find((m) => m.id === p.projectId)?.start) || null;
-          return <ProjectCard key={p.key} project={p} start={start} previous={runs[1] ?? null} now={now} onOpen={(k) => openProject(k, 'rapport')} />;
+          return <ProjectCard key={p.key} project={p} start={start} previous={runs[1] ?? null} now={now} onOpen={openProject} />;
         })}
       </div>
     );

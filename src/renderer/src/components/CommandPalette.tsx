@@ -9,7 +9,7 @@ interface Props {
   openProject(key: string): void;
 }
 
-const VIEWS: View[] = ['home', 'projects', 'github', 'intra', 'myepitech', 'teams', 'settings'];
+const VIEWS: View[] = ['dashboard', 'home', 'projects', 'github', 'intra', 'myepitech', 'teams', 'settings'];
 
 export function CommandPalette({ open, setView, openProject }: Props): JSX.Element | null {
   const [shown, setShown] = useState(false);

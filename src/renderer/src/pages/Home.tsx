@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { scoreOf } from '../../../shared/score';
-import type { DeadlineView, RunSummary, ServiceId, Settings } from '../../../shared/types';
+import type { DeadlineView, ServiceId, Settings } from '../../../shared/types';
 import type { OpenFn, Snapshot } from '../App';
-import { projectKey } from '../../../shared/projects';
+import { latestResults } from '../dashboard';
 import { Card } from '../components/Card';
 import { DeadlineRow } from '../components/DeadlineRow';
 import { RepoPicker } from '../components/RepoPicker';
@@ -47,11 +47,7 @@ export function Home({ snapshot, settings, onSettings, open, openProject, setVie
   const common = { open, setView, refresh };
   const gh = snapshot?.github.data;
   const mye = snapshot?.myepitech.data;
-  const results: RunSummary[] = Object.values(mye?.runs ?? {})
-    .map((runs) => runs[0])
-    .filter((r): r is RunSummary => !!r)
-    .sort((a, b) => Date.parse(b.date) - Date.parse(a.date))
-    .slice(0, 5);
+  const results = latestResults(mye, 5);
   const profile = mye?.profile;
   const unread = snapshot?.teams.data?.unread ?? 0;
 
@@ -104,12 +100,12 @@ export function Home({ snapshot, settings, onSettings, open, openProject, setVie
         <Card title="My Epitech" service="myepitech" snap={snapshot?.myepitech} {...common}>
           {results.length === 0 ? <p className="dim">Aucun résultat.</p> : (
             <ul className="list">
-              {results.map((r) => {
+              {results.map(({ run: r, key }) => {
                 const score = scoreOf(r.categories);
                 return (
                   <li key={r.id} className="row">
                     <div className="row-main">
-                      <button type="button" className="link" onClick={() => openProject(projectKey(r.unitCode, r.projectCode))}>{r.title}</button>
+                      <button type="button" className="link" onClick={() => openProject(key)}>{r.title}</button>
                       <div className="dim small">{r.unitCode}</div>
                     </div>
                     <strong className={score !== null && score >= 50 ? 'ok' : 'bad'}>{score === null ? '—' : `${score} %`}</strong>
