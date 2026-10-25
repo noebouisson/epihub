@@ -8,4 +8,4 @@ export const SERVICES: { id: ServiceId; label: string; home: string; partition: 
   { id: 'teams', label: 'Teams', home: SERVICE_HOMES.teams, partition: 'persist:teams' }
 ];
 
-export type View = 'home' | ServiceId | 'settings';
+export type View = 'home' | 'projects' | ServiceId | 'settings';

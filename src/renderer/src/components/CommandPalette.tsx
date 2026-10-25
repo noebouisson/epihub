@@ -6,11 +6,12 @@ import type { View } from '../services';
 interface Props {
   open: OpenFn;
   setView(view: View): void;
+  openProject(key: string): void;
 }
 
-const VIEWS: View[] = ['home', 'github', 'intra', 'myepitech', 'teams', 'settings'];
+const VIEWS: View[] = ['home', 'projects', 'github', 'intra', 'myepitech', 'teams', 'settings'];
 
-export function CommandPalette({ open, setView }: Props): JSX.Element | null {
+export function CommandPalette({ open, setView, openProject }: Props): JSX.Element | null {
   const [shown, setShown] = useState(false);
   const [q, setQ] = useState('');
   const [items, setItems] = useState<SearchItem[]>([]);
@@ -61,7 +62,8 @@ export function CommandPalette({ open, setView }: Props): JSX.Element | null {
     if (item.kind === 'page') {
       const v = item.id.replace(/^page:/, '') as View;
       if (VIEWS.includes(v)) setView(v);
-    } else open(item.service, item.url);
+    } else if (item.kind === 'project') openProject(item.id.slice('project:'.length));
+    else open(item.service, item.url);
   };
 
   if (!shown) return null;

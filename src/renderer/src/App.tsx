@@ -5,6 +5,8 @@ import { CommandPalette } from './components/CommandPalette';
 import { ServiceView, type OpenRequest } from './components/ServiceView';
 import { Sidebar } from './components/Sidebar';
 import { Home } from './pages/Home';
+import { Project } from './pages/Project';
+import { Projects } from './pages/Projects';
 import { Settings as SettingsPage } from './pages/Settings';
 import { SERVICES, type View } from './services';
 import './styles/app.css';
@@ -19,6 +21,7 @@ export function App(): JSX.Element {
   const [requests, setRequests] = useState<Partial<Record<ServiceId, OpenRequest>>>({});
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [settings, setSettings] = useState<Settings | null>(null);
+  const [projectKey, setProjectKey] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -31,7 +34,8 @@ export function App(): JSX.Element {
 
   const select = useCallback((v: View) => {
     setView(v);
-    if (v !== 'home' && v !== 'settings') setMounted((m) => (m.has(v) ? m : new Set(m).add(v)));
+    if (v === 'projects') setProjectKey(null);
+    if (v !== 'home' && v !== 'projects' && v !== 'settings') setMounted((m) => (m.has(v) ? m : new Set(m).add(v)));
   }, []);
 
   const open: OpenFn = useCallback(
@@ -42,6 +46,11 @@ export function App(): JSX.Element {
     },
     [select]
   );
+
+  const openProject = useCallback((key: string) => {
+    setProjectKey(key);
+    setView('projects');
+  }, []);
 
   useEffect(() => {
     void window.epihub.snapshot().then(setSnapshot);
@@ -62,13 +71,18 @@ export function App(): JSX.Element {
     <div className="app">
       <Sidebar view={view} snapshot={snapshot} onSelect={select} />
       <main className="content">
-        {view === 'home' && <Home snapshot={snapshot} settings={settings} onSettings={setSettings} open={open} setView={select} toast={showToast} />}
+        {view === 'home' && <Home snapshot={snapshot} settings={settings} onSettings={setSettings} open={open} openProject={openProject} setView={select} toast={showToast} />}
+        {view === 'projects' && (projectKey === null ? (
+          <Projects openProject={openProject} />
+        ) : (
+          <Project key={projectKey} projectKey={projectKey} settings={settings} repos={snapshot?.github.data?.repos ?? []} open={open} toast={showToast} onSettings={setSettings} onBack={() => setProjectKey(null)} />
+        ))}
         {view === 'settings' && <SettingsPage snapshot={snapshot} settings={settings} onSettings={setSettings} open={open} />}
         {SERVICES.filter((s) => mounted.has(s.id)).map((s) => (
           <ServiceView key={s.id} service={s.id} visible={view === s.id} request={requests[s.id]} state={snapshot?.[s.id].status.state} />
         ))}
       </main>
-      <CommandPalette open={open} setView={select} />
+      <CommandPalette open={open} setView={select} openProject={openProject} />
       {toast && <div className="toast" role="status">{toast}</div>}
     </div>
   );

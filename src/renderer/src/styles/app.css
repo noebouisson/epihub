@@ -114,3 +114,18 @@ h2 { font-size: 15px; margin: 0; }
 .list-btn { width: 100%; text-align: left; background: transparent; border: 0; border-radius: 8px; padding: 8px 10px; }
 .list-btn:hover, .list-btn.selected { background: var(--bg-hover); }
 .toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); background: var(--accent); color: var(--accent-text); padding: 10px 18px; border-radius: 10px; z-index: 60; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4); }
+
+/* Projets */
+.filter { max-width: 240px; }
+.wrap { flex-wrap: wrap; align-items: center; }
+.stack-sm { display: flex; flex-direction: column; gap: 6px; }
+.project-head { display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px; }
+.description { white-space: pre-wrap; margin: 0 0 8px; max-height: 14em; overflow-y: auto; }
+.score-chart { width: 100%; max-width: 560px; height: auto; display: block; margin-bottom: 10px; }
+.chart-grid { stroke: var(--border); stroke-width: 1; }
+.chart-label { fill: var(--text-dim); font-size: 10px; }
+.chart-line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; }
+.chart-dot { fill: var(--accent); stroke: var(--bg-elev); stroke-width: 1.5; }
+.skill { width: 100%; }
+.skill summary { display: flex; justify-content: space-between; gap: 12px; cursor: pointer; }
+.tests { padding: 6px 0 2px 16px; gap: 2px; }

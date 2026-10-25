@@ -25,6 +25,7 @@ export function Sidebar({ view, snapshot, onSelect }: Props): JSX.Element {
         <span className="brand-name">EpiHub</span>
       </div>
       {item('home', '⌂', 'Accueil')}
+      {item('projects', '📁', 'Projets')}
       {SERVICES.map((s) => {
         const snap = snapshot?.[s.id];
         const needsLogin = snap?.status.state === 'needs-login';

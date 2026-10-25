@@ -12,11 +12,12 @@ interface Props {
   settings: Settings | null;
   onSettings(s: Settings): void;
   open: OpenFn;
+  openProject(key: string): void;
   setView(view: View): void;
   toast(message: string): void;
 }
 
-export function Home({ snapshot, settings, onSettings, open, setView, toast }: Props): JSX.Element {
+export function Home({ snapshot, settings, onSettings, open, openProject, setView, toast }: Props): JSX.Element {
   const [deadlines, setDeadlines] = useState<DeadlineView[]>([]);
   const [picking, setPicking] = useState<DeadlineView | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -57,7 +58,7 @@ export function Home({ snapshot, settings, onSettings, open, setView, toast }: P
           {deadlines.length === 0 ? (
             <p className="dim">Aucun rendu à venir.</p>
           ) : (
-            <ul className="list">{deadlines.map((d) => <DeadlineRow key={d.id} deadline={d} open={open} toast={toast} onLink={setPicking} />)}</ul>
+            <ul className="list">{deadlines.map((d) => <DeadlineRow key={d.id} deadline={d} open={open} openProject={openProject} toast={toast} onLink={setPicking} />)}</ul>
           )}
         </Card>
 
