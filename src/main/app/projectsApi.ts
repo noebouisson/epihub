@@ -10,8 +10,19 @@ export interface ProjectsApiDeps {
 }
 
 /** Liste et détail des projets, calculés à la demande à partir du dernier instantané des services. */
-export function createProjectsApi(deps: ProjectsApiDeps): { list(): Promise<ProjectSummary[]>; detail(key: unknown, force: unknown): Promise<ProjectDetail | null> } {
-  async function list(): Promise<ProjectSummary[]> {
+const MEMO_TTL = 3000
+
+export interface ProjectsApi {
+  list(): Promise<ProjectSummary[]>
+  detail(key: unknown, force: unknown): Promise<ProjectDetail | null>
+  /** Oublie la liste mémorisée (instantané ou réglages modifiés). */
+  invalidate(): void
+}
+
+export function createProjectsApi(deps: ProjectsApiDeps): ProjectsApi {
+  let memo: { at: number; promise: Promise<ProjectSummary[]> } | null = null
+
+  async function compute(): Promise<ProjectSummary[]> {
     const s = deps.snapshot()
     const data = { github: s.github.data, intra: s.intra.data, myepitech: s.myepitech.data, teams: s.teams.data }
     return buildProjects({
@@ -22,8 +33,21 @@ export function createProjectsApi(deps: ProjectsApiDeps): { list(): Promise<Proj
       now: new Date(deps.now())
     })
   }
+  function list(): Promise<ProjectSummary[]> {
+    if (memo && deps.now() - memo.at < MEMO_TTL) return memo.promise
+    const entry = { at: deps.now(), promise: compute() }
+    memo = entry
+    // Une erreur n'est pas mémorisée.
+    entry.promise.catch(() => {
+      if (memo === entry) memo = null
+    })
+    return entry.promise
+  }
   return {
     list,
+    invalidate: () => {
+      memo = null
+    },
     async detail(key, force) {
       if (typeof key !== 'string') return null
       const summary = (await list()).find((p) => p.key === key)

@@ -123,6 +123,7 @@ function start(): void {
     now: Date.now,
     initial: cache.load(),
     onChange: (_id, snap) => {
+      projects.invalidate();
       mainWindow?.webContents.send('epihub:changed', registry.snapshot());
       if (snap.status.state === 'ok') {
         try {
