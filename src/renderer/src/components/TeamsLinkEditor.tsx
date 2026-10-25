@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import type { Settings } from '../../../shared/types';
-import { isTeamsUrl } from '../../../shared/projects';
+import { isTeamsUrl, linkPatch, type ProjectKeys } from '../../../shared/projects';
 import type { OpenFn } from '../App';
 import { ShareButton } from './ShareButton';
 
 interface Props {
-  projectKey: string;
+  project: ProjectKeys;
   url: string | null;
   settings: Settings | null;
   share: { title: string; url: string; context?: string } | null;
@@ -14,18 +14,16 @@ interface Props {
   onSaved(settings: Settings): void;
 }
 
-export function TeamsLinkEditor({ projectKey, url, settings, share, open, toast, onSaved }: Props): JSX.Element {
+export function TeamsLinkEditor({ project, url, settings, share, open, toast, onSaved }: Props): JSX.Element {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const write = async (next: string | null): Promise<void> => {
     if (!settings) return;
-    const links = { ...settings.projectTeamsLinks };
-    if (next === null) delete links[projectKey];
-    else links[projectKey] = next;
     try {
-      onSaved(await window.epihub.updateSettings({ projectTeamsLinks: links }));
+      // Écrit (ou retire) sous chaque alias du projet.
+      onSaved(await window.epihub.updateSettings({ projectTeamsLinks: linkPatch(settings.projectTeamsLinks, project, next) }));
       setEditing(false);
       setError(null);
     } catch {

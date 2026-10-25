@@ -5,6 +5,7 @@ import { Card } from '../components/Card';
 import { RepoPicker } from '../components/RepoPicker';
 import { ScoreChart } from '../components/ScoreChart';
 import { TeamsLinkEditor } from '../components/TeamsLinkEditor';
+import { findProject, isTeamsUrl, linkPatch, resolveLink } from '../../../shared/projects';
 import { relativeTime } from '../time';
 
 interface Props {
@@ -54,7 +55,7 @@ export function Project({ projectKey: key, settings, repos, open, toast, onSetti
     let live = true;
     setDetail(undefined);
     setListSummary(null);
-    void window.epihub.projects().then((l) => live && setListSummary(l.find((p) => p.key === key) ?? null)).catch(() => undefined);
+    void window.epihub.projects().then((l) => live && setListSummary(findProject(l, key) ?? null)).catch(() => undefined);
     load(false);
     return () => {
       live = false;
@@ -83,7 +84,7 @@ export function Project({ projectKey: key, settings, repos, open, toast, onSetti
 
   const d = summary.deadline;
   const retry = (): void => load(true);
-  const teamsUrl = settings ? (settings.projectTeamsLinks[key] ?? null) : summary.teamsUrl;
+  const teamsUrl = settings ? resolveLink(settings.projectTeamsLinks, summary, isTeamsUrl) : summary.teamsUrl;
   const shareUrl = d?.url ?? summary.lastResult?.url ?? null;
   const linked = summary.repo;
   const myepitechUrl = summary.lastResult?.url ?? null;
@@ -204,7 +205,7 @@ export function Project({ projectKey: key, settings, repos, open, toast, onSetti
         <Card title="Teams" wide>
           <TeamsLinkEditor
             key={`${key}:${teamsUrl ?? ''}`}
-            projectKey={key}
+            project={summary}
             url={teamsUrl}
             settings={settings}
             share={shareUrl ? { title: summary.title, url: shareUrl, context: summary.moduleCode } : null}
@@ -218,14 +219,12 @@ export function Project({ projectKey: key, settings, repos, open, toast, onSetti
       {picking && settings && (
         <RepoPicker
           title={`Lier un repo à « ${summary.title} »`}
-          current={settings.projectRepoLinks[key] ?? null}
+          current={resolveLink(settings.projectRepoLinks, summary)}
           repos={repos}
           settings={settings}
           onSelect={async (fullName) => {
-            const links = { ...settings.projectRepoLinks };
-            if (fullName === null) delete links[key];
-            else links[key] = fullName;
-            afterLinkChange(await window.epihub.updateSettings({ projectRepoLinks: links }));
+            // Écrit sous chaque alias : l'accueil (clé intranet) et la page projet voient le même repo.
+            afterLinkChange(await window.epihub.updateSettings({ projectRepoLinks: linkPatch(settings.projectRepoLinks, summary, fullName) }));
           }}
           onSaved={onSettings}
           onClose={() => setPicking(false)}

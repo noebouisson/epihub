@@ -6,7 +6,7 @@ import type { DeadlineView, ProjectSummary, Repo, TestResult } from '../../src/s
 const repo: Repo = { fullName: 'octocat/cpoolday01', name: 'cpoolday01', url: 'https://github.com/octocat/cpoolday01', pushedAt: '2026-10-01T00:00:00Z', defaultBranch: 'main' }
 const deadline: DeadlineView = { id: 'acti-1', moduleCode: 'G-CPE-100', projectCode: 'cpoolday01', title: 'Day 01', end: '2026-10-30T00:00:00Z', url: 'https://intra.example/p', repo, lastCommit: null, alert: null, manual: false }
 const lastResult: TestResult = { id: 'r9', project: 'Day 01', module: 'G-CPE-100', slug: 'cpoolday01', date: '2026-10-20T00:00:00Z', percent: 50, url: 'u' }
-const full: ProjectSummary = { key: 'G-CPE-100/day01', title: 'Day 01', moduleCode: 'G-CPE-100', deadline, lastResult, repo, teamsUrl: null, status: 'en-cours' }
+const full: ProjectSummary = { key: 'G-CPE-100/day01', aliases: ['G-CPE-100/day01'], title: 'Day 01', moduleCode: 'G-CPE-100', deadline, lastResult, repo, teamsUrl: null, status: 'en-cours' }
 
 const failing = (e: Error) => () => Promise.reject(e)
 

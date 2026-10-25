@@ -28,7 +28,7 @@ describe('buildSearchItems', () => {
 })
 
 describe('projets', () => {
-  const summary = { key: 'G-CPE-100/cpoolday01', title: 'Day 01', moduleCode: 'G-CPE-100', deadline: null, lastResult: null, repo: null, teamsUrl: null, status: 'en-cours' } as const
+  const summary = { key: 'G-CPE-100/cpoolday01', aliases: ['G-CPE-100/cpoolday01'], title: 'Day 01', moduleCode: 'G-CPE-100', deadline: null, lastResult: null, repo: null, teamsUrl: null, status: 'en-cours' as const }
   test('recherche : élément projet', () => {
     const items = buildSearchItems({}, [summary])
     expect(search(items, 'cpoolday')[0].id).toBe('project:G-CPE-100/cpoolday01')

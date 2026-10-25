@@ -28,7 +28,8 @@ export interface SearchItem { id: string; kind: 'repo' | 'pr' | 'issue' | 'deadl
 export interface Settings { repoLinks: Record<string /* deadline id */, string /* repo fullName */>; projectRepoLinks: Record<string /* projectKey */, string /* repo fullName */>; projectTeamsLinks: Record<string /* projectKey */, string /* URL Teams */>; notify: Record<ServiceId, boolean>; theme: 'dark' | 'light' }
 
 export interface ProjectSummary {
-  key: string; title: string; moduleCode: string
+  /** Clé canonique (clé du slug My Epitech s'il y a un résultat, sinon clé intranet) ; `aliases` : toutes les clés du projet. */
+  key: string; aliases: string[]; title: string; moduleCode: string
   deadline: DeadlineView | null; lastResult: TestResult | null
   repo: Repo | null; teamsUrl: string | null; status: 'en-cours' | 'termine'
 }

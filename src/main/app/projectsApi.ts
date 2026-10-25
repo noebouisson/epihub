@@ -1,4 +1,5 @@
 import { buildProjects } from '../links/projects'
+import { findProject } from '../../shared/projects'
 import type { DeadlineView, ProjectDetail, ProjectSummary, ServiceId, Settings } from '../../shared/types'
 
 export interface ProjectsApiDeps {
@@ -50,7 +51,8 @@ export function createProjectsApi(deps: ProjectsApiDeps): ProjectsApi {
     },
     async detail(key, force) {
       if (typeof key !== 'string') return null
-      const summary = (await list()).find((p) => p.key === key)
+      // Une clé intranet (accueil) ou un ancien alias ouvre le projet fusionné.
+      const summary = findProject(await list(), key)
       return summary ? deps.details.get(summary, !!force) : null
     }
   }

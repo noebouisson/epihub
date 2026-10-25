@@ -22,14 +22,40 @@ const key = projectKey('G-CPE-100', 'C Pool Day 01')
 
 const dvA = dv({ id: 'a', title: 'A', projectCode: 'a', end: iso(now.getTime() + 2 * day) })
 const dvB = dv({ id: 'b', title: 'B', projectCode: 'b', end: iso(now.getTime() + day) })
-const resC = res({ id: 'c', project: 'C', date: '2026-10-20T00:00:00Z' })
-const resD = res({ id: 'd', project: 'D', date: '2026-10-22T00:00:00Z' })
+const resC = res({ id: 'c', project: 'C', slug: 'c', date: '2026-10-20T00:00:00Z' })
+const resD = res({ id: 'd', project: 'D', slug: 'd', date: '2026-10-22T00:00:00Z' })
 
-test('fusionne intranet et My Epitech de même clé', () => {
-  const p = buildProjects({ deadlines: [dv({ moduleCode: 'G-CPE-100', title: 'C Pool Day 01' })], results: [res({ module: 'G-CPE-100', project: 'cpoolday01', date: '2026-10-20T10:00:00Z' })], repos: [], settings: empty, now })
+test('fusionne intranet et My Epitech (formes réelles : titre intranet ≠ nom My Epitech)', () => {
+  const p = buildProjects({ deadlines: [dv({ moduleCode: 'G-CPE-100', title: 'C Pool Day 01' })], results: [res({ module: 'G-CPE-100', project: 'Day 01', slug: 'cpoolday01', date: '2026-10-20T10:00:00Z' })], repos: [], settings: empty, now })
   expect(p).toHaveLength(1)
   expect(p[0]).toMatchObject({ key: 'G-CPE-100/cpoolday01', title: 'C Pool Day 01', status: 'en-cours' })
+  expect(p[0].deadline?.id).toBe('acti-1')
   expect(p[0].lastResult?.date).toBe('2026-10-20T10:00:00Z')
+  expect(p[0].aliases).toEqual(['G-CPE-100/cpoolday01', 'G-CPE-100/day01'])
+})
+test('repli : titre intranet identique au nom My Epitech, slug différent', () => {
+  const p = buildProjects({ deadlines: [dv({ title: 'Day 01' })], results: [res({ project: 'Day 01', slug: 'cpool-d01' })], repos: [], settings: empty, now })
+  expect(p).toHaveLength(1)
+  expect(p[0].key).toBe('G-CPE-100/cpoold01')
+  expect(p[0].aliases).toEqual(['G-CPE-100/day01', 'G-CPE-100/cpoold01'])
+})
+test('pas de fusion entre modules différents', () =>
+  expect(buildProjects({ deadlines: [dv()], results: [res({ module: 'G-CPE-200', project: 'Day 01' })], repos: [], settings: empty, now })).toHaveLength(2))
+test('slug vide (ancien cache) → clé du nom', () =>
+  expect(buildProjects({ deadlines: [], results: [res({ project: 'Day 01', slug: '' })], repos: [], settings: empty, now })[0].key).toBe('G-CPE-100/day01'))
+test('lien enregistré sous la clé intranet retrouvé quand le rendu a quitté le tableau', () => {
+  const settings = { ...empty, projectRepoLinks: { [key]: 'me/proj' }, projectTeamsLinks: { [key]: 'https://teams.microsoft.com/l/chat/x' } }
+  const p = buildProjects({ deadlines: [], results: [res({ project: 'Day 01', slug: 'cpoolday01' })], repos: [repo('me/proj')], settings, now })
+  expect(p).toHaveLength(1)
+  expect(p[0].repo?.fullName).toBe('me/proj')
+  expect(p[0].teamsUrl).toBe('https://teams.microsoft.com/l/chat/x')
+})
+test('lien sous un alias (nom My Epitech) lu après la clé canonique', () => {
+  const repos = [repo('me/a'), repo('me/b')]
+  const run = (links: Record<string, string>): string | undefined =>
+    buildProjects({ deadlines: [dv()], results: [res({ project: 'Day 01' })], repos, settings: { ...empty, projectRepoLinks: links }, now })[0].repo?.fullName
+  expect(run({ 'G-CPE-100/day01': 'me/b' })).toBe('me/b')
+  expect(run({ 'G-CPE-100/day01': 'me/b', [key]: 'me/a' })).toBe('me/a')
 })
 test('projet seulement My Epitech → terminé, sans deadline', () =>
   expect(buildProjects({ deadlines: [], results: [res({})], repos: [], settings: empty, now })[0]).toMatchObject({ status: 'termine', deadline: null }))
