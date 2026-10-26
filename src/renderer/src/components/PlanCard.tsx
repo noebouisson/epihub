@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PlanStep, PlanView, SubjectInfo } from '../../../shared/types';
-import { formatTarget, groupByPriority, PRIORITY_LABEL, SOURCE_LABEL } from '../planView';
+import { groupByPriority, PRIORITY_LABEL, SOURCE_LABEL, targetLabel } from '../planView';
 
 interface Props {
   projectKey: string;
@@ -124,7 +124,7 @@ export function PlanCard({ projectKey: key, toast }: Props): JSX.Element {
       <details key={s.id} className="plan-step" open={s.id === current}>
         <summary>
           <span className="plan-step-title">{s.title}</span>
-          {s.target && <span className="dim small"> · avant le {formatTarget(s.target)}</span>}
+          {s.target && <span className="dim small"> · {targetLabel(s.target)}</span>}
           {lateIds.has(s.id) && <span className="badge badge-danger">En retard</span>}
         </summary>
         {s.details && <p className="dim small plan-details">{s.details}</p>}

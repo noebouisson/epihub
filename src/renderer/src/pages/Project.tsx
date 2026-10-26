@@ -8,6 +8,7 @@ import { RepoPicker } from '../components/RepoPicker';
 import { ScoreChart } from '../components/ScoreChart';
 import { TeamsLinkEditor } from '../components/TeamsLinkEditor';
 import { findProject, isTeamsUrl, linkPatch, resolveLink } from '../../../shared/projects';
+import { showPlanCard } from '../planView';
 import { projectPage, scoreLine } from '../projectView';
 import { relativeTime } from '../time';
 import { SERVICE_HOMES } from '../../../shared/domains';
@@ -173,7 +174,7 @@ export function Project({ projectKey: key, anchor, settings, repos, open, toast,
       </header>
 
       <div className="grid">
-        {d && <PlanCard key={key} projectKey={key} toast={toast} />}
+        {showPlanCard(summary) && <PlanCard key={key} projectKey={key} toast={toast} />}
         <Card title="Sujet" badge={<SectionBadge section={subject} service="myepitech" open={open} retry={retry} />}>
           {subject?.state === 'unavailable' && <p className="dim">Pas de description sur My Epitech pour ce projet</p>}
           {subject?.state === 'ok' && subject.data && (
