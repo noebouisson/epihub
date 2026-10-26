@@ -36,12 +36,13 @@ const isTitle = (l: string): boolean => {
 }
 
 /** Vrai titre de section (fin de la partie Bonus) : `#`, MAJUSCULES sans ponctuation finale, ou titre numéroté court suivi d'une ligne vide. */
-function isSectionTitle(lines: string[], i: number): boolean {
+function isSectionTitle(lines: string[], i: number, lastNum: number): boolean {
   const t = lines[i].trim()
   if (/^#+\s+\S/.test(t)) return true
   const letters = t.replace(/[^A-Za-zÀ-ÿ]/g, '')
   if (letters.length >= 3 && t.length <= 40 && t === t.toUpperCase() && !/[.:;,!?]$/.test(t)) return true
   const m = /^\d+(?:\.\d+)*[.)]?\s+(\S.*)$/.exec(t)
+  if (m && Number(/^\d+/.exec(t)![0]) === lastNum + 1) return false // suite de la liste numérotée
   if (!m || lines[i + 1] === undefined || lines[i + 1].trim() !== '' || /[.:;,!?]/.test(m[1])) return false
   const words = m[1].split(/\s+/)
   return words.length <= 6 && words.every((w) => w.length <= 3 || /^[A-ZÀ-Ý]/.test(w)) && /^[A-ZÀ-Ý]/.test(words[0])
@@ -175,7 +176,12 @@ function bonusRange(lines: string[]): [number, number] | null {
   const s = lines.findIndex((l) => BONUS_TITLE.test(l))
   if (s < 0) return null
   let e = lines.length
-  for (let i = s + 1; i < lines.length; i++) if (isSectionTitle(lines, i)) { e = i; break }
+  let lastNum = 0
+  for (let i = s + 1; i < lines.length; i++) {
+    if (isSectionTitle(lines, i, lastNum)) { e = i; break }
+    const n = /^(\d+)(?:\.\d+)*[.)]?\s+\S/.exec(lines[i].trim())
+    if (n) lastNum = Number(n[1])
+  }
   return [s, e]
 }
 

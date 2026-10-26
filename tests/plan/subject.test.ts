@@ -79,8 +79,10 @@ test('interdits : « Global variables are forbidden » → aucune fonction, mais
 test('bonus numéroté conservé', () => {
   expect(parseSubject('Bonus\n1. Colors\n2. Sizes').bonus).toEqual(['1. Colors', '2. Sizes'])
   expect(parseSubject('Bonus\n1. Handle colors.\n\n2. Show sizes.').bonus).toEqual(['1. Handle colors.', '2. Show sizes.'])
-  // un titre numéroté court suivi d'une ligne vide ferme la section
-  expect(parseSubject('Bonus\n1. Colors\n2. Output Format\n\nSome text.').bonus).toEqual(['1. Colors'])
+  // la suite de la numérotation n'est jamais un titre
+  expect(parseSubject('Bonus\n1. Colors\n2. Output Format\n\nSome text.').bonus).toEqual(['1. Colors', '2. Output Format', 'Some text.'])
+  // un titre numéroté qui ne suit pas la liste ferme la section
+  expect(parseSubject('Bonus\n1. Colors\n\n3. Output Format\n\nSome text.').bonus).toEqual(['1. Colors'])
 })
 test('bonus : fin au titre en majuscules ou # mais pas aux lignes ordinaires', () => {
   expect(parseSubject('Bonus\nA\nB\n\nEXAMPLES\nC').bonus).toEqual(['A', 'B'])
