@@ -4,7 +4,7 @@ const VERDICT = { reussi: 'Réussi', partiel: 'Partiel', echoue: 'Échoué' } as
 const PRIORITY = { 1: 'Priorité haute', 2: 'Priorité moyenne', 3: 'Priorité basse' } as const
 
 /** Texte issu des données : une seule ligne, caractères Markdown échappés. */
-const esc = (s: string) => s.replace(/\s*[\r\n]+\s*/g, ' ').replace(/[\\`*_[\]<>#]/g, (c) => `\\${c}`)
+export const esc = (s: string) => s.replace(/\s*[\r\n]+\s*/g, ' ').replace(/[\\`*_[\]<>#]/g, (c) => `\\${c}`)
 
 function fence(comment: string): string {
   const longest = Math.max(0, ...(comment.match(/`+/g) ?? []).map((m) => m.length))

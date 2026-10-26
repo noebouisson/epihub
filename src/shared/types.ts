@@ -127,3 +127,9 @@ export interface SubjectInfo {
   bonus: string[]
   missing: string[]
 }
+export interface PlanItem { id: string; text: string }
+/** `target` : date cible locale `YYYY-MM-DD`, ou null (fin passée ou absente). */
+export interface PlanStep { id: string; title: string; details: string; items: PlanItem[]; target: string | null }
+export interface PlanStatus { progress: number; current: PlanStep | null; late: PlanStep[] }
+export interface Improvement { source: 'moulinette' | 'repo' | 'temps'; priority: 1 | 2 | 3; text: string }
+export interface RepoCheck { lastPush: string | null; hasMakefile: boolean; forbiddenFiles: string[]; hasTests: boolean }
