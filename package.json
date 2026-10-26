@@ -16,6 +16,7 @@
     "dist": "electron-vite build && electron-builder --linux AppImage deb"
   },
   "devDependencies": {
+    "@types/node": "^22.20.5",
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^4.7.0",
@@ -27,8 +28,10 @@
     "react-dom": "^18.3.1",
     "typescript": "^5.9.3",
     "vite": "^5.4.21",
-    "vitest": "^2.1.9",
-    "@types/node": "^22.20.5"
+    "vitest": "^2.1.9"
   },
-  "homepage": "https://github.com/noebouisson/epihub"
+  "homepage": "https://github.com/noebouisson/epihub",
+  "dependencies": {
+    "pdfjs-dist": "6.3.289"
+  }
 }

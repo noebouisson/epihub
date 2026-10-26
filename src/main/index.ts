@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { app, BrowserWindow, clipboard, net, Notification, safeStorage, session, shell } from 'electron';
+import { app, BrowserWindow, clipboard, dialog, net, Notification, safeStorage, session, shell } from 'electron';
 import { projectKey } from '../shared/projects';
 import type { ServiceId } from '../shared/types';
 import { debounce } from './app/debounce';
@@ -13,6 +13,8 @@ import { createProjectDetails } from './app/projectDetails';
 import { createProjectsApi } from './app/projectsApi';
 import { revealWindow } from './app/window';
 import { registerIpc } from './ipc';
+import { createPlanAssembler } from './plan/assemble';
+import { createPlanStore } from './plan/store';
 import { createReportPipeline, rapportsDir } from './reports/pipeline';
 import { exportPdf } from './reports/pdf';
 import { createReportStore } from './reports/store';
@@ -132,6 +134,19 @@ function start(): void {
     projectKeyOf: (p) => projectKey(p.unitCode, p.name)
   });
 
+  const planStore = createPlanStore(dir);
+  const planAssembler = createPlanAssembler({
+    store: planStore,
+    projects: () => projects.list(),
+    latestReport: (key) => {
+      const entry = reportStore.list(key)[0];
+      return entry ? reportStore.report(entry.runId) : null;
+    },
+    rootContents: (fullName) => github.rootContents(fullName),
+    hasGithubToken: () => !!secrets.getGithubToken(),
+    now: () => new Date()
+  });
+
   // Un cycle de rafraîchissement (4 services) ne déclenche qu'un seul passage des effets.
   const runEffects = debounce(() => {
     const s = registry.snapshot();
@@ -183,6 +198,17 @@ function start(): void {
       openPath: (p) => shell.openPath(p),
       showItemInFolder: (p) => shell.showItemInFolder(p),
       exportPdf: (report, out) => exportPdf(report, out, dir)
+    },
+    plan: {
+      store: planStore,
+      assembler: planAssembler,
+      dir: join(app.getPath('documents'), 'EpiHub', 'plans'),
+      choosePdf: async () => {
+        const opts = { title: 'Choisir le sujet (PDF)', properties: ['openFile' as const], filters: [{ name: 'PDF', extensions: ['pdf'] }] };
+        const res = mainWindow ? await dialog.showOpenDialog(mainWindow, opts) : await dialog.showOpenDialog(opts);
+        return res.canceled || res.filePaths.length !== 1 ? null : res.filePaths[0];
+      },
+      now: () => new Date()
     },
     writeClipboard: (t) => clipboard.writeText(t)
   });

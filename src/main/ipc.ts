@@ -1,10 +1,15 @@
-import { mkdir } from 'node:fs/promises'
-import { dirname } from 'node:path'
+import { mkdir, readFile, stat, writeFile } from 'node:fs/promises'
+import { basename, dirname, join } from 'node:path'
 import { ipcMain, type IpcMainInvokeEvent } from 'electron'
-import type { Report, ReportEntry, ProjectDetail, ProjectSummary, ServiceId, Settings, TeamsNotificationPayload } from '../shared/types'
+import type { ImportSubjectResult, PlanSummary, PlanView, Report, ReportEntry, ProjectDetail, ProjectSummary, ServiceId, Settings, TeamsNotificationPayload } from '../shared/types'
 import { clip, TEAMS_DEDUP_TTL, teamsKey } from './app/effects'
 import { buildSearchItems, search } from './links/searchIndex'
 import { shareText } from './links/shareText'
+import type { PlanAssembler } from './plan/assemble'
+import { MAX_PDF_BYTES, extractPdfText } from './plan/pdfText'
+import { renderPlanMarkdown } from './plan/markdown'
+import { sanitizeKey, validItemId, type PlanStore } from './plan/store'
+import { parseSubject } from './plan/subject'
 import { isInsideDir, pdfPathFor } from './reports/pipeline'
 import { latestReportsFor, reportsForKey } from './reports/query'
 import { validRunId, type ReportStore } from './reports/store'
@@ -29,6 +34,15 @@ export interface IpcDeps {
     openPath(path: string): Promise<string>
     showItemInFolder(path: string): void
     exportPdf(report: Report, outFile: string): Promise<void>
+  }
+  plan: {
+    store: PlanStore
+    assembler: PlanAssembler
+    /** `<Documents>/EpiHub/plans` */
+    dir: string
+    /** Sélecteur de PDF rattaché à la fenêtre principale ; null si annulé. */
+    choosePdf(): Promise<string | null>
+    now(): Date
   }
   writeClipboard(text: string): void
   refreshTeams(): void
@@ -133,6 +147,49 @@ export function registerIpc(deps: IpcDeps): void {
     if (!isInsideDir(out, deps.reports.dir)) return null
     await mkdir(dirname(out), { recursive: true })
     await deps.reports.exportPdf(report, out)
+    deps.reports.showItemInFolder(out)
+    return out
+  })
+
+  const planErr = (err: unknown): string => {
+    // Seuls nos propres messages (PDF illisible, trop gros…) sont montrés ; jamais le contenu du sujet.
+    const m = err instanceof Error ? err.message : ''
+    return ['PDF illisible', 'PDF trop gros', 'PDF trop long', 'Ce PDF ne contient pas de texte lisible'].includes(m) ? m : 'Import impossible'
+  }
+  handle('epihub:subject:import', async (_e, key: unknown): Promise<ImportSubjectResult> => {
+    const k = await deps.plan.assembler.canonicalKey(key)
+    if (!k) return { ok: false, error: 'Projet introuvable' }
+    const file = await deps.plan.choosePdf()
+    if (!file) return { ok: false, error: 'annulé' }
+    try {
+      if ((await stat(file)).size > MAX_PDF_BYTES) return { ok: false, error: 'PDF trop gros' }
+      const pdf = new Uint8Array(await readFile(file))
+      const text = await extractPdfText(pdf)
+      deps.plan.store.saveSubject(k, basename(file), pdf, text, parseSubject(text))
+      return { ok: true }
+    } catch (err) {
+      console.error('[epihub] import du sujet:', planErr(err))
+      return { ok: false, error: planErr(err) }
+    }
+  })
+  handle('epihub:subject:remove', async (_e, key: unknown): Promise<void> => {
+    const k = await deps.plan.assembler.canonicalKey(key)
+    if (k) deps.plan.store.removeSubject(k)
+  })
+  handle('epihub:plan:get', async (_e, key: unknown): Promise<PlanView | null> => (typeof key === 'string' ? deps.plan.assembler.view(key) : null))
+  handle('epihub:plan:toggle', async (_e, key: unknown, itemId: unknown, done: unknown): Promise<string[]> => {
+    const k = await deps.plan.assembler.canonicalKey(key)
+    if (!k || !validItemId(itemId) || typeof done !== 'boolean') return []
+    return deps.plan.store.toggle(k, itemId, done)
+  })
+  handle('epihub:plan:summaries', (): Promise<Record<string, PlanSummary>> => deps.plan.assembler.summaries())
+  handle('epihub:plan:export', async (_e, key: unknown): Promise<string | null> => {
+    const view = typeof key === 'string' ? await deps.plan.assembler.view(key) : null
+    if (!view?.subject) return null
+    const out = join(deps.plan.dir, `${sanitizeKey(view.unitCode)}-${sanitizeKey(view.title)}.md`)
+    if (!isInsideDir(out, deps.plan.dir)) return null
+    await mkdir(dirname(out), { recursive: true })
+    await writeFile(out, renderPlanMarkdown({ title: view.title, unitCode: view.unitCode, info: view.subject.info, steps: view.steps, done: view.done, improvements: view.improvements, now: deps.plan.now() }), 'utf8')
     deps.reports.showItemInFolder(out)
     return out
   })

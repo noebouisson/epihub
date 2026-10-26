@@ -4,6 +4,9 @@ directories:
   output: dist
 files:
   - out/**
+  # pdfjs : seul le build « legacy » Node est utilisé ; le canvas natif optionnel (~36 Mo) est inutile pour extraire du texte.
+  - "!node_modules/@napi-rs/**"
+  - "!node_modules/pdfjs-dist/{web,types,build}/**"
 linux:
   target:
     - AppImage

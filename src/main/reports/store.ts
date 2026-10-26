@@ -5,6 +5,12 @@ import type { Report, ReportEntry } from '../../shared/types'
 /** Un identifiant de passage ne contient que des chiffres (il sert aussi de nom de fichier). */
 export const validRunId = (v: unknown): v is string => typeof v === 'string' && /^\d+$/.test(v)
 
+/** Écriture atomique : fichier temporaire puis renommage. */
+export function atomicWrite(file: string, data: string | Uint8Array): void {
+  writeFileSync(`${file}.tmp`, data, { mode: 0o600 })
+  renameSync(`${file}.tmp`, file)
+}
+
 interface Index { initialized: boolean; entries: Record<string, ReportEntry>; /** Passages du lot initial dont la génération a échoué : jamais notifiés. */ silent: string[] }
 
 const isEntry = (e: unknown): e is ReportEntry =>
@@ -40,11 +46,6 @@ export function createReportStore(dir: string): ReportStore {
     }
   }
   let index = load()
-  /** Écriture atomique : fichier temporaire puis renommage. */
-  const atomicWrite = (file: string, data: string): void => {
-    writeFileSync(`${file}.tmp`, data, { mode: 0o600 })
-    renameSync(`${file}.tmp`, file)
-  }
   /** L'index en mémoire n'est remplacé qu'une fois l'écriture réussie. */
   const commit = (next: Index): void => {
     mkdirSync(dir, { recursive: true })

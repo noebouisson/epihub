@@ -80,6 +80,15 @@ export interface EpihubApi {
   report(runId: string): Promise<Report | null>
   openReportFile(runId: string): Promise<boolean>
   exportReportPdf(runId: string): Promise<string | null>
+  /** Ouvre le sélecteur de PDF, analyse et stocke le sujet du projet en cours. */
+  importSubject(projectKey: string): Promise<ImportSubjectResult>
+  removeSubject(projectKey: string): Promise<void>
+  plan(projectKey: string): Promise<PlanView | null>
+  /** Coche ou décoche un item ; renvoie les items cochés. */
+  togglePlanItem(projectKey: string, itemId: string, done: boolean): Promise<string[]>
+  /** Écrit la marche à suivre en Markdown ; renvoie le chemin, ou null. */
+  exportPlan(projectKey: string): Promise<string | null>
+  planSummaries(): Promise<Record<string, PlanSummary>>
 }
 
 /* ---- Rapports de moulinette ---- */
@@ -133,3 +142,11 @@ export interface PlanStep { id: string; title: string; details: string; items: P
 export interface PlanStatus { progress: number; current: PlanStep | null; late: PlanStep[] }
 export interface Improvement { source: 'moulinette' | 'repo' | 'temps'; priority: 1 | 2 | 3; text: string }
 export interface RepoCheck { lastPush: string | null; hasMakefile: boolean; forbiddenFiles: string[]; hasTests: boolean }
+
+export interface PlanView {
+  projectKey: string; title: string; unitCode: string; end: string | null
+  subject: { fileName: string; importedAt: number; info: SubjectInfo } | null
+  steps: PlanStep[]; done: string[]; status: PlanStatus; improvements: Improvement[]
+}
+export interface PlanSummary { hasSubject: boolean; current: { title: string; target: string | null } | null; late: boolean; progress: number }
+export type ImportSubjectResult = { ok: true } | { ok: false; error: string }

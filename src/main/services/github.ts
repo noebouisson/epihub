@@ -19,6 +19,7 @@ export function createGithubService(
   lastCommit(fullName: string, branch: string): Promise<Commit | null>
   recentCommits(fullName: string, branch: string): Promise<Commit[]>
   openPulls(fullName: string): Promise<PullSummary[]>
+  rootContents(fullName: string): Promise<{ name: string; type: 'file' | 'dir' }[]>
 } {
   const cache = new Map<string, { etag: string; body: string }>()
 
@@ -104,6 +105,14 @@ export function createGithubService(
       return (await commitsOf(fullName, branch, 1))[0] ?? null
     },
     recentCommits: (fullName, branch) => commitsOf(fullName, branch, 5),
+    async rootContents(fullName): Promise<{ name: string; type: 'file' | 'dir' }[]> {
+      if (!/^[\w.-]+\/[\w.-]+$/.test(fullName)) throw new Error('GitHub: dépôt invalide')
+      // 404 : dépôt vide ou inaccessible (liste vide) ; l'appelant traite une erreur comme « pas de contrôle ».
+      const list = await get(`/repos/${fullName}/contents`, [404])
+      if (list === null) return []
+      if (!Array.isArray(list)) throw new Error('GitHub: réponse inattendue')
+      return list.map((e) => ({ name: String(e.name), type: e.type === 'dir' ? ('dir' as const) : ('file' as const) }))
+    },
     async openPulls(fullName): Promise<PullSummary[]> {
       const list = await get(`/repos/${fullName}/pulls?state=open&per_page=10`)
       if (!Array.isArray(list)) throw new Error('GitHub: réponse inattendue')
