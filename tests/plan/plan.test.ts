@@ -8,7 +8,7 @@ const read = (f: string) => readFileSync(join(__dirname, '../fixtures/subjects',
 const en = parseSubject(read('my_ls_en.txt'))
 const fr = parseSubject(read('extrait_fr.txt'))
 const now = new Date('2026-10-26T10:00:00')
-const w = { start: '2026-10-20', end: '2026-11-06T18:42:00Z', now }
+const w = { start: '2026-10-20', end: '2026-11-06T18:42:00', now }
 
 test('étapes du sujet my_ls dans l’ordre', () => expect(buildPlan(en, w).map((s) => s.id)).toEqual(['setup', 'base', 'option:-a', 'option:-l', 'option:-R', 'option:-d', 'option:-r', 'option:-t', 'errors', 'tests', 'finish', 'bonus']))
 test('contenu : setup, option, erreurs, tests, bonus', () => {
@@ -47,7 +47,7 @@ test('poids : setup 1/16,5 de dix jours → 27/10 ; base cumul 3 → 28/10', () 
   expect(s[1].target).toBe('2026-10-28')
 })
 test('début futur : la fenêtre commence au début', () => {
-  const t = buildPlan(en, { start: '2026-11-01', end: '2026-11-06T18:42:00Z', now }).map((s) => s.target!)
+  const t = buildPlan(en, { start: '2026-11-01', end: '2026-11-06T18:42:00', now }).map((s) => s.target!)
   expect(t[0] >= '2026-11-01').toBe(true)
   expect(t[t.length - 1]).toBe('2026-11-05')
 })
@@ -61,7 +61,7 @@ test('rendu dans moins d’un jour → pas de NaN, dates ≤ fin', () => {
   expect(t.every((x) => x === null || /^\d{4}-\d{2}-\d{2}$/.test(x))).toBe(true)
   expect(t.every((x) => x !== null && x <= '2026-10-26')).toBe(true)
 })
-test('début invalide ignoré', () => expect(buildPlan(en, { start: 'x', end: '2026-11-06T18:42:00Z', now }).every((s) => /^\d{4}-\d{2}-\d{2}$/.test(s.target!))).toBe(true))
+test('début invalide ignoré', () => expect(buildPlan(en, { start: 'x', end: '2026-11-06T18:42:00', now }).every((s) => /^\d{4}-\d{2}-\d{2}$/.test(s.target!))).toBe(true))
 test('sans options → étape features', () => {
   const s = buildPlan(fr, w)
   expect(s.map((x) => x.id)).toContain('features')

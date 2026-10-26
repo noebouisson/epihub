@@ -1,7 +1,7 @@
 import type { Report } from '../../shared/types'
 
 const VERDICT = { reussi: 'Réussi', partiel: 'Partiel', echoue: 'Échoué' } as const
-const PRIORITY = { 1: 'Priorité haute', 2: 'Priorité moyenne', 3: 'Priorité basse' } as const
+export const PRIORITY = { 1: 'Priorité haute', 2: 'Priorité moyenne', 3: 'Priorité basse' } as const
 
 /** Texte issu des données : une seule ligne, caractères Markdown échappés. */
 export const esc = (s: string) => s.replace(/\s*[\r\n]+\s*/g, ' ').replace(/[\\`*_[\]<>#]/g, (c) => `\\${c}`)

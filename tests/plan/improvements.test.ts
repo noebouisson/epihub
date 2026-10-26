@@ -9,7 +9,7 @@ import { rep } from '../reports/helpers'
 
 const en = parseSubject(readFileSync(join(__dirname, '../fixtures/subjects/my_ls_en.txt'), 'utf8'))
 const now = new Date('2026-10-26T10:00:00')
-const end = '2026-11-06T18:42:00Z'
+const end = '2026-11-06T18:42:00'
 const steps = buildPlan(en, { start: '2026-10-20', end, now })
 const okRepo: RepoCheck = { lastPush: '2026-10-25T10:00:00', hasMakefile: true, forbiddenFiles: [], hasTests: true }
 const base = { info: en, steps, done: [] as string[], report: null, repo: okRepo as RepoCheck | null | 'not-linked', end: end as string | null, now }

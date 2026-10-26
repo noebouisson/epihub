@@ -1,8 +1,7 @@
 import type { Improvement, PlanStep, SubjectInfo } from '../../shared/types'
-import { esc } from '../reports/markdown'
+import { esc, PRIORITY } from '../reports/markdown'
 import { dayLabel, planStatus } from './plan'
 
-const PRIORITY = { 1: 'Priorité haute', 2: 'Priorité moyenne', 3: 'Priorité basse' } as const
 const SOURCE = { moulinette: 'moulinette', repo: 'repo', temps: 'temps' } as const
 
 const pad = (n: number) => String(n).padStart(2, '0')

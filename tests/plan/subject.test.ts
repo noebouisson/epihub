@@ -62,3 +62,44 @@ test('bonus : arrêt au titre suivant et limite 30', () => {
   const many = 'Bonus\n' + Array.from({ length: 40 }, (_, i) => `ligne ${i}`).join('\n')
   expect(parseSubject(many).bonus).toHaveLength(30)
 })
+
+test('interdits : liste après deux-points, jamais de mots courants', () => {
+  expect(parseSubject('The use of the following functions is forbidden: printf, puts.').forbidden).toEqual(['printf', 'puts'])
+  expect(parseSubject('Forbidden functions: `foo`, bar(), my_func').forbidden).toEqual(['foo', 'bar', 'my_func'])
+  expect(parseSubject('Les fonctions printf et puts sont interdites.').forbidden).toEqual(['printf', 'puts'])
+  expect(parseSubject('printf is forbidden: use write instead.').forbidden).toEqual(['printf'])
+})
+test('interdits : « Global variables are forbidden » → aucune fonction, mais une exigence', () => {
+  for (const t of ['Global variables are forbidden.', 'Les variables globales sont interdites.']) {
+    const i = parseSubject(t)
+    expect(i.forbidden).toEqual([])
+    expect(i.requirements).toEqual([t])
+  }
+})
+test('bonus numéroté conservé', () => {
+  expect(parseSubject('Bonus\n1. Colors\n2. Sizes').bonus).toEqual(['1. Colors', '2. Sizes'])
+  expect(parseSubject('Bonus\n1. Handle colors.\n\n2. Show sizes.').bonus).toEqual(['1. Handle colors.', '2. Show sizes.'])
+  // un titre numéroté court suivi d'une ligne vide ferme la section
+  expect(parseSubject('Bonus\n1. Colors\n2. Output Format\n\nSome text.').bonus).toEqual(['1. Colors'])
+})
+test('bonus : fin au titre en majuscules ou # mais pas aux lignes ordinaires', () => {
+  expect(parseSubject('Bonus\nA\nB\n\nEXAMPLES\nC').bonus).toEqual(['A', 'B'])
+  expect(parseSubject('Bonus\nA\n## Notes\nC').bonus).toEqual(['A'])
+  expect(parseSubject('Bonus\nHandle Colors\nEXTRA FEATURE.').bonus).toEqual(['Handle Colors', 'EXTRA FEATURE.'])
+})
+test('options : formes -l, --long, puces, drapeau seul', () => {
+  const o = parseSubject('-l, --long   long format\n* -a  all entries\n• -r reverse\n-t\nsort by time\n--human-readable  sizes').options
+  expect(o).toEqual([
+    { flag: '-l', description: '--long: long format' },
+    { flag: '-a', description: 'all entries' },
+    { flag: '-r', description: 'reverse' },
+    { flag: '-t', description: 'sort by time' },
+    { flag: '--human-readable', description: 'sizes' }
+  ])
+})
+test('fonctions écrites name()', () => expect(parseSubject('Authorized functions: open(), read(), close()').authorizedFunctions).toEqual(['open', 'read', 'close']))
+test('un bloc d’exemple n’est jamais fondu dans une phrase', () => {
+  const i = parseSubject('The program must work\n\n~/x> ./a\nok\nmust not appear\n\nIt should end.')
+  expect(i.requirements).toEqual(['The program must work', 'It should end.'])
+  expect(i.examples).toEqual(['~/x> ./a\nok\nmust not appear'])
+})

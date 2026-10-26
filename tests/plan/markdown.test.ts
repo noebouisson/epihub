@@ -7,7 +7,7 @@ import { renderPlanMarkdown } from '../../src/main/plan/markdown'
 
 const en = parseSubject(readFileSync(join(__dirname, '../fixtures/subjects/my_ls_en.txt'), 'utf8'))
 const now = new Date('2026-10-26T10:00:00')
-const steps = buildPlan(en, { start: null, end: '2026-11-06T18:42:00Z', now })
+const steps = buildPlan(en, { start: null, end: '2026-11-06T18:42:00', now })
 const v = { title: 'My LS', unitCode: 'B-PSU-100', info: en, steps, done: [steps[0].items[0].id], improvements: [{ source: 'repo' as const, priority: 1 as const, text: 'Ajoute un Makefile' }, { source: 'temps' as const, priority: 3 as const, text: 'Termine avant le bonus' }], now }
 
 test('sections, titre, cases cochées et non cochées', () => {
