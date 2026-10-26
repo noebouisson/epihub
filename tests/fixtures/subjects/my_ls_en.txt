@@ -1,0 +1,43 @@
+MY_LS
+Reimplementation of the ls command
+
+Binary name: my_ls
+Repository name: B-PSU-100-my_ls
+Language: C
+Compilation: via Makefile, including re, clean and fclean rules
+Authorized functions: opendir, readdir, closedir, stat, lstat, write, malloc,
+free, getpwuid, getgrgid, time, ctime, readlink, perror, strerror, exit
+
+DESCRIPTION
+
+Your program must list the content of the given directories, or of the
+current directory when no argument is given.
+Your program should sort the entries in alphabetical order by default.
+printf is forbidden: use write and your own formatting functions.
+If an error occurs, the program must exit with 84.
+You may use unit tests (criterion) with a tests_run rule in your Makefile.
+
+OPTIONS
+
+-a    do not ignore entries starting with .
+-l    use a long listing format
+-R    list subdirectories recursively
+-d    list directories themselves, not their contents
+-r    reverse order while sorting
+-t    sort by modification time, newest first
+
+EXAMPLES
+
+∼/B-PSU-100> ./my_ls -l
+total 12
+-rw-r--r-- 1 jane jane  120 Oct 20 10:00 Makefile
+drwxr-xr-x 2 jane jane 4096 Oct 20 10:00 src
+
+∼/B-PSU-100> ./my_ls -a
+.  ..  Makefile  src
+
+BONUS
+
+Handle colors depending on the file type.
+Support the -h option for human readable sizes.
+Display extended attributes.

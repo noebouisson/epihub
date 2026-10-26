@@ -114,3 +114,16 @@ export interface Report {
 
 /** Entrée de l'index des rapports (`file` : chemin du .md, ou null si l'écriture a échoué). */
 export interface ReportEntry { runId: string; projectKey: string; projectId: string; file: string | null; score: number | null; verdict: Verdict; date: string; generatedAt: number }
+
+/* ---- Marche à suivre ---- */
+export interface SubjectInfo {
+  binaryName: string | null; language: string | null; repoName: string | null
+  compilation: string | null; makefileRules: string[]
+  authorizedFunctions: string[]; forbidden: string[]
+  options: { flag: string; description: string }[]
+  requirements: string[]
+  errorCode84: boolean; unitTests: boolean
+  examples: string[]
+  bonus: string[]
+  missing: string[]
+}

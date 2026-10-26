@@ -1,0 +1,9 @@
+MY_SUDO
+
+Nom du binaire : my_sudo
+Langage : C
+Fonctions autorisées : setuid, setgid, execvp, getpwnam,
+crypt, getpass
+
+Le programme doit vérifier le mot de passe de l'utilisateur.
+En cas de problème, le programme doit retourner 84.
