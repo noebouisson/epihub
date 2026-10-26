@@ -153,3 +153,22 @@ h2 { font-size: 15px; margin: 0; }
 .report-comment { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; margin: 6px 0; font-size: 12px; white-space: pre-wrap; overflow: auto; max-height: 14em; }
 .report-blockers, .report-advice, .report-working { margin: 4px 0; padding-left: 18px; }
 .link.selected { font-weight: 700; }
+
+/* Marche à suivre */
+.plan-info { margin: 0 0 8px; display: flex; flex-direction: column; gap: 4px; }
+.plan-info-row { display: flex; gap: 10px; align-items: baseline; }
+.plan-info dt { flex: 0 0 170px; color: var(--text-dim); font-size: 12px; }
+.plan-info dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.plan-progress { margin: 12px 0 8px; }
+.plan-steps { display: flex; flex-direction: column; gap: 6px; }
+.plan-step { border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; }
+.plan-step[open] { background: var(--bg-hover); }
+.plan-step summary { cursor: pointer; }
+.plan-step-title { font-weight: 600; }
+.plan-details { margin: 6px 0 0; overflow-wrap: anywhere; }
+.plan-items { margin-top: 6px; }
+.plan-item { display: flex; gap: 8px; align-items: flex-start; cursor: pointer; overflow-wrap: anywhere; min-width: 0; }
+.plan-item input { margin-top: 3px; accent-color: var(--accent); }
+.plan-done { color: var(--text-dim); text-decoration: line-through; }
+.plan-line { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 6px 0; }
+.plan-line .badge { margin-left: 0; }

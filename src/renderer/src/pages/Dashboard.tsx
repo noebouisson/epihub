@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { ProjectSummary, ReportEntry } from '../../../shared/types';
+import type { PlanSummary, ProjectSummary, ReportEntry } from '../../../shared/types';
 import type { OpenFn, Snapshot } from '../App';
 import { ProjectCard } from '../components/ProjectCard';
 import { dashboardSummary, notConnectedBanner, sortProjects, verdictFor } from '../dashboard';
@@ -13,6 +13,7 @@ interface Props {
 
 export function Dashboard({ snapshot, open, openProject }: Props): JSX.Element {
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null);
+  const [plans, setPlans] = useState<Record<string, PlanSummary>>({});
   const [entries, setEntries] = useState<Record<string, ReportEntry>>({});
 
   useEffect(() => {
@@ -20,6 +21,7 @@ export function Dashboard({ snapshot, open, openProject }: Props): JSX.Element {
     const loadEntries = (): void => void window.epihub.latestReports().then((e) => live && setEntries(e)).catch(() => undefined);
     const load = (): void => {
       void window.epihub.projects().then((l) => live && setProjects(l)).catch(() => live && setProjects((c) => c ?? []));
+      void window.epihub.planSummaries().then((m) => live && setPlans(m)).catch(() => undefined);
       loadEntries();
     };
     load();
@@ -65,7 +67,7 @@ export function Dashboard({ snapshot, open, openProject }: Props): JSX.Element {
         {sorted.map((p) => {
           const runs = (p.projectId && mye?.data?.runs[p.projectId]) || [];
           const start = (p.projectId && mye?.data?.projects.find((m) => m.id === p.projectId)?.start) || null;
-          return <ProjectCard key={p.key} project={p} start={start} previous={runs[1] ?? null} verdict={verdictFor(p, entries)} now={now} onOpen={openProject} />;
+          return <ProjectCard key={p.key} project={p} start={start} previous={runs[1] ?? null} verdict={verdictFor(p, entries)} now={now} plan={plans[p.key] ?? null} onOpen={openProject} />;
         })}
       </div>
     );

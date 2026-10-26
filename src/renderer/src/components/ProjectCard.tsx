@@ -1,6 +1,7 @@
 import { scoreOf } from '../../../shared/score';
-import type { ProjectSummary, RunSummary, Verdict } from '../../../shared/types';
+import type { PlanSummary, ProjectSummary, RunSummary, Verdict } from '../../../shared/types';
 import { mainProblem, progressOf } from '../dashboard';
+import { formatTarget } from '../planView';
 import { VERDICT_BADGE, VERDICT_LABEL } from './ReportView';
 
 interface Props {
@@ -12,11 +13,13 @@ interface Props {
   /** Verdict du dernier passage (celui du rapport s'il existe, voir `verdictFor`). */
   verdict: Verdict | null;
   now: Date;
+  /** Marche à suivre (projets en cours) ; null tant qu'elle n'est pas chargée. */
+  plan?: PlanSummary | null;
   /** `anchor` : `rapport` (carte Moulinette) seulement s'il existe un passage. */
   onOpen(key: string, anchor?: string): void;
 }
 
-export function ProjectCard({ project: p, start, previous, verdict, now, onOpen }: Props): JSX.Element {
+export function ProjectCard({ project: p, start, previous, verdict, now, plan, onOpen }: Props): JSX.Element {
   const last = p.lastResult;
   const score = last ? scoreOf(last.categories) : null;
   const prevScore = previous ? scoreOf(previous.categories) : null;
@@ -35,6 +38,16 @@ export function ProjectCard({ project: p, start, previous, verdict, now, onOpen 
           </div>
           <span className="small">{progress.label}</span>
         </div>
+      )}
+      {p.deadline && plan && (
+        <p className="small plan-line">
+          {plan.hasSubject ? (
+            <span>{plan.current ? `Étape : ${plan.current.title}${plan.current.target ? ` · ${formatTarget(plan.current.target)}` : ''}` : 'Marche à suivre terminée'}</span>
+          ) : (
+            <span className="dim">Ajoute le sujet</span>
+          )}
+          {plan.late && <span className="badge badge-danger">En retard</span>}
+        </p>
       )}
       <p className="project-score">
         <strong className="big">{score === null ? '—' : `${score} %`}</strong>

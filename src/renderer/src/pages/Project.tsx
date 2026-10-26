@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ProjectDetail, ProjectSummary, Repo, Report, ReportEntry, Section, ServiceId, Settings } from '../../../shared/types';
 import type { OpenFn } from '../App';
 import { Card } from '../components/Card';
+import { PlanCard } from '../components/PlanCard';
 import { ReportView, VERDICT_BADGE, VERDICT_LABEL } from '../components/ReportView';
 import { RepoPicker } from '../components/RepoPicker';
 import { ScoreChart } from '../components/ScoreChart';
@@ -172,6 +173,7 @@ export function Project({ projectKey: key, anchor, settings, repos, open, toast,
       </header>
 
       <div className="grid">
+        {d && <PlanCard key={key} projectKey={key} toast={toast} />}
         <Card title="Sujet" badge={<SectionBadge section={subject} service="myepitech" open={open} retry={retry} />}>
           {subject?.state === 'unavailable' && <p className="dim">Pas de description sur My Epitech pour ce projet</p>}
           {subject?.state === 'ok' && subject.data && (
