@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { expect, test } from 'vitest'
+import { describe, expect, test } from 'vitest'
 import { buildPlan } from '../../src/main/plan/plan'
 import { parseSubject } from '../../src/main/plan/subject'
 
@@ -150,4 +150,32 @@ test('numéros de page seuls ignorés partout', () => {
   const i = parseSubject('The program must read the\n12\nwhole file.\nAuthorized functions: open,\n3\nread')
   expect(i.requirements).toEqual(['The program must read the whole file.'])
   expect(i.authorizedFunctions).toEqual(['open', 'read'])
+})
+
+describe('les exemples n’avalent pas ce qui suit', () => {
+  const ex = '~/x> ./prog -l\ntotal 4\n-rw-r--r-- 1 a a 0 f\n\n'
+  test('exemple, ligne vide, phrase d’introduction puis options', () => {
+    const i = parseSubject(ex + 'Your program must accept the following options:\n-l use a long listing format\n-R list subdirectories recursively')
+    expect(i.options.map((o) => o.flag)).toEqual(['-l', '-R'])
+    expect(i.requirements).toContain('Your program must accept the following options:')
+    expect(i.examples).toEqual(['~/x> ./prog -l\ntotal 4\n-rw-r--r-- 1 a a 0 f'])
+  })
+  test('exemple, ligne vide, lignes d’options', () => {
+    expect(parseSubject(ex + '-l use a long listing format\n-R list subdirectories recursively').options.map((o) => o.flag)).toEqual(['-l', '-R'])
+  })
+  test('exigence sur deux lignes après un exemple', () => {
+    expect(parseSubject(ex + 'Your program must list the content of the\ngiven directories.').requirements).toEqual(['Your program must list the content of the given directories.'])
+  })
+  test('première sortie en majuscules (HELLO) : pas d’écran d’aide, OPTIONS ferme le bloc', () => {
+    const i = parseSubject('~/x> ./hello\nHELLO\nworld\nOPTIONS\n-l use a long listing format')
+    expect(i.options.map((o) => o.flag)).toEqual(['-l'])
+    expect(parseSubject('~/x> ./hello\nHELLO\n\n-l use a long listing format').options.map((o) => o.flag)).toEqual(['-l'])
+  })
+  test('titre « Options » en casse mixte après un exemple', () => {
+    expect(parseSubject(ex + 'Options\n-l use a long listing format\n-R list subdirectories recursively').options.map((o) => o.flag)).toEqual(['-l', '-R'])
+  })
+  test('écran d’aide fermé après 25 lignes au plus', () => {
+    const help = ['~/x> ./prog -h', 'USAGE', ...Array.from({ length: 30 }, (_, k) => `line${k}`), '-z zap everything']
+    expect(parseSubject(help.join('\n')).options.map((o) => o.flag)).toEqual(['-z'])
+  })
 })

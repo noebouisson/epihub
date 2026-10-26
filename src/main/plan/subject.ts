@@ -63,13 +63,15 @@ const optionOf = (l: string): { flag: string; description: string } | null => {
 }
 const isOptionLine = (l: string): boolean => optionOf(l) !== null || BARE_FLAG.test(l)
 
-/** Phrase de prose : se termine par un point, au moins 5 mots, ne commence pas par une option. */
-const isProse = (t: string): boolean => /\.$/.test(t) && !/^-/.test(t) && t.split(/\s+/).length >= 5
+const HELP_START = /^usage\b\s*:?/i
+const HELP_MAX_LINES = 25
 
 /**
- * Blocs d'exemple `[début, fin[` : de l'invite jusqu'à la prochaine invite, un titre de section ou une phrase de prose
- * (les lignes vides n'y mettent pas fin). Un écran d'aide (première ligne de sortie en MAJUSCULES, ex. USAGE) garde
- * ses titres internes : seuls une phrase, une invite ou un titre `#` le ferment. Lignes vides finales exclues.
+ * Blocs d'exemple `[début, fin[` : de l'invite jusqu'à une ligne vide, un titre de section ou la prochaine invite.
+ * Écran d'aide (première ligne de sortie `USAGE` / `Usage:`) : ses lignes vides et titres internes (DESCRIPTION…)
+ * ne le ferment pas ; il se ferme à la prochaine invite, à un titre `#`, après une ligne vide suivie d'une ligne
+ * non indentée qui est une phrase (≥ 5 mots) ou se termine par `:`, et au plus tard après 25 lignes.
+ * Lignes vides finales exclues.
  */
 function exampleBlocks(lines: string[]): [number, number][] {
   const out: [number, number][] = []
@@ -78,9 +80,14 @@ function exampleBlocks(lines: string[]): [number, number][] {
   lines.forEach((l, i) => {
     const t = l.trim()
     if (PROMPT.test(l)) { close(); cur = { start: i, last: i, help: null }; return }
-    if (!cur || t === '') return
-    if (cur.help === null) cur.help = isUpperTitle(t)
-    if (isProse(t) || /^#+\s+\S/.test(t) || (!cur.help && isSectionTitle(lines, i))) { close(); return }
+    if (!cur) return
+    if (t === '') { if (cur.help === false) close(); return }
+    if (cur.help === null) cur.help = HELP_START.test(t)
+    if (cur.help) {
+      const afterBlank = lines[i - 1]?.trim() === ''
+      const closing = afterBlank && !/^\s/.test(l) && !/^-/.test(t) && (t.split(/\s+/).length >= 5 || /:$/.test(t))
+      if (closing || /^#+\s+\S/.test(t) || i - cur.start > HELP_MAX_LINES) { close(); return }
+    } else if (isSectionTitle(lines, i)) { close(); return }
     cur.last = i
   })
   close()

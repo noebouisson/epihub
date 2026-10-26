@@ -51,7 +51,7 @@ Règles (insensibles à la casse, anglais et français) :
 - `makefileRules` : mots `re`, `clean`, `fclean`, `all`, `tests_run` cités dans la ligne Compilation.
 - `forbidden` : fonctions citées dans les phrases contenant `forbidden|interdit`.
 - `options` : lignes qui commencent par un drapeau `-x` / `-xy` / `--long` suivi d'une description ; dédupliquées dans l'ordre.
-- Blocs d'exemple : de l'invite jusqu'à la prochaine invite, un titre de section ou une phrase (point final, ≥ 5 mots, pas de drapeau en tête), lignes vides comprises ; un écran d'aide (première ligne de sortie en MAJUSCULES, ex. `USAGE`) garde ses titres internes. Les drapeaux d'un exemple ne sont jamais des options.
+- Blocs d'exemple : de l'invite jusqu'à une ligne vide, un titre de section ou la prochaine invite. Écran d'aide (première ligne de sortie `USAGE` / `Usage:`) : lignes vides et titres internes conservés ; fermé à la prochaine invite, à un titre `#`, après une ligne vide suivie d'une ligne non indentée qui est une phrase (≥ 5 mots) ou se termine par `:`, et au plus tard après 25 lignes. Les drapeaux d'un exemple ne sont jamais des options.
 - Lignes composées uniquement de chiffres (numéros de page) ignorées ; puces `✓` `✔` `•` retirées en début de ligne.
 - `errorCode84` : présence de `84` dans une phrase contenant `exit|return|code|retour|erreur|error`.
 - `unitTests` : `unit test|tests unitaires|criterion|tests_run`.
