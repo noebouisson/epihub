@@ -105,3 +105,17 @@ test('un bloc d’exemple n’est jamais fondu dans une phrase', () => {
   expect(i.requirements).toEqual(['The program must work', 'It should end.'])
   expect(i.examples).toEqual(['~/x> ./a\nok\nmust not appear'])
 })
+
+test('interdits : un nom de la libc courant seul n’est pas une fonction', () => {
+  for (const t of ['Any use of time is forbidden.', 'Free software is forbidden.', 'free software is forbidden.', 'Global_variables are forbidden.']) expect(parseSubject(t).forbidden).toEqual([])
+  expect(parseSubject('printf, puts and write are forbidden.').forbidden).toEqual(['printf', 'puts', 'write'])
+  expect(parseSubject('Les fonctions printf et write sont interdites.').forbidden).toEqual(['printf', 'write'])
+  expect(parseSubject('Forbidden: free.').forbidden).toEqual(['free'])
+  expect(parseSubject('The use of time() is forbidden.').forbidden).toEqual(['time'])
+  expect(parseSubject('The function my_strlen is forbidden.').forbidden).toEqual(['my_strlen'])
+})
+test('bonus numéroté en majuscules conservé', () => {
+  expect(parseSubject('Bonus\n1. COLORS\n2. SIZES').bonus).toEqual(['1. COLORS', '2. SIZES'])
+  expect(parseSubject('Bonus\n1. COLORS\n\n2. SIZES\n\nEXAMPLES\nx').bonus).toEqual(['1. COLORS', '2. SIZES'])
+  expect(parseSubject('Bonus\n3. COLORS\n4. SIZES').bonus).toEqual(['3. COLORS', '4. SIZES'])
+})

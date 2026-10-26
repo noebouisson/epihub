@@ -1,7 +1,7 @@
 import type { Report } from '../../shared/types'
+import { PRIORITY } from './markdown'
 
 const VERDICT = { reussi: 'Réussi', partiel: 'Partiel', echoue: 'Échoué' } as const
-const PRIORITY = { 1: 'Priorité haute', 2: 'Priorité moyenne', 3: 'Priorité basse' } as const
 const COLOR = { reussi: '#1a7f37', partiel: '#9a6700', echoue: '#cf222e' } as const
 
 const e = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#39;' })[c]!)

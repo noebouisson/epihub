@@ -28,6 +28,9 @@ const LIBC = new Set(('printf fprintf sprintf snprintf dprintf vprintf vfprintf 
   'exit abort sleep usleep fopen fclose fread fwrite fflush perror strerror time ctime opendir readdir closedir getenv setenv pipe dup dup2 ' +
   'pthread_create mmap munmap isalpha isdigit toupper tolower').split(' '))
 
+/** Noms de la libc qui sont aussi des mots courants : acceptés seulement en liste (voir `cFunctions`). */
+const COMMON = new Set('free time system read write open close exit wait signal sleep kill pipe dup stat exec fork abort getline access link select'.split(' '))
+
 const isTitle = (l: string): boolean => {
   const t = l.trim()
   if (/^#+\s+\S/.test(t) || /^\d+(\.\d+)*[.)]?\s+\S/.test(t)) return true
@@ -36,13 +39,12 @@ const isTitle = (l: string): boolean => {
 }
 
 /** Vrai titre de section (fin de la partie Bonus) : `#`, MAJUSCULES sans ponctuation finale, ou titre numéroté court suivi d'une ligne vide. */
-function isSectionTitle(lines: string[], i: number, lastNum: number): boolean {
+function isSectionTitle(lines: string[], i: number): boolean {
   const t = lines[i].trim()
   if (/^#+\s+\S/.test(t)) return true
   const letters = t.replace(/[^A-Za-zÀ-ÿ]/g, '')
   if (letters.length >= 3 && t.length <= 40 && t === t.toUpperCase() && !/[.:;,!?]$/.test(t)) return true
   const m = /^\d+(?:\.\d+)*[.)]?\s+(\S.*)$/.exec(t)
-  if (m && Number(/^\d+/.exec(t)![0]) === lastNum + 1) return false // suite de la liste numérotée
   if (!m || lines[i + 1] === undefined || lines[i + 1].trim() !== '' || /[.:;,!?]/.test(m[1])) return false
   const words = m[1].split(/\s+/)
   return words.length <= 6 && words.every((w) => w.length <= 3 || /^[A-ZÀ-Ý]/.test(w)) && /^[A-ZÀ-Ý]/.test(words[0])
@@ -115,15 +117,34 @@ function functionsOf(lines: string[], start: number, first: string): string[] {
   return uniq(out)
 }
 
-/** Noms de fonctions C d'un morceau de phrase : `nom()`, `nom` entre accents graves, noms avec `_` ou connus de la libc. */
+const CONNECTOR = new Set(['and', 'et', 'or', 'ou', '&'])
+const STRONG_UNDERSCORE = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$/
+
+/**
+ * Noms de fonctions C d'un morceau de phrase. Toujours acceptés : `nom()`, `nom` entre accents graves, identifiants en minuscules avec `_`.
+ * Un nom de la libc qui est aussi un mot courant (free, time, read…) n'est accepté qu'en liste : après un deux-points, ou dans une suite de 2 noms ou plus (virgules, and, et).
+ */
 function cFunctions(side: string): string[] {
+  const colon = side.indexOf(':')
+  type W = { name: string | null; strong: boolean; connector: boolean; afterColon: boolean }
+  const words: W[] = [...side.matchAll(/\S+/g)].map((m) => {
+    const t = m[0].replace(/^[("'“]+/, '').replace(/[.:,;"'”]+$/, '')
+    const id = /^(`?)([A-Za-z_][A-Za-z0-9_]*)(\(\))?\1$/.exec(t)
+    const name = id ? id[2] : null
+    const strong = !!id && (!!id[1] || !!id[3] || STRONG_UNDERSCORE.test(id[2]) || (LIBC.has(id[2]) && !COMMON.has(id[2])))
+    const bare = !!name && !strong && LIBC.has(name)
+    return { name: strong || bare ? name : null, strong, connector: CONNECTOR.has(t.toLowerCase()), afterColon: colon >= 0 && (m.index ?? 0) > colon }
+  })
   const out: string[] = []
-  for (const raw of side.split(/[\s,;]+/)) {
-    const t = raw.replace(/^[("'“]+/, '').replace(/[.:"'”]+$/, '')
-    const m = /^(`?)([A-Za-z_][A-Za-z0-9_]*)(\(\))?\1$/.exec(t)
-    if (!m) continue
-    const name = m[2]
-    if (m[1] || m[3] || name.includes('_') || LIBC.has(name)) out.push(name)
+  let i = 0
+  while (i < words.length) {
+    if (words[i].name === null) { i++; continue }
+    let j = i
+    let last = i
+    while (j < words.length && (words[j].name !== null || words[j].connector)) { if (words[j].name !== null) last = j; j++ }
+    const run = words.slice(i, last + 1).filter((w) => w.name !== null)
+    for (const w of run) if (w.strong || run.length >= 2 || w.afterColon) out.push(w.name!)
+    i = j
   }
   return out
 }
@@ -176,10 +197,12 @@ function bonusRange(lines: string[]): [number, number] | null {
   const s = lines.findIndex((l) => BONUS_TITLE.test(l))
   if (s < 0) return null
   let e = lines.length
-  let lastNum = 0
+  let lastNum: number | null = null
   for (let i = s + 1; i < lines.length; i++) {
-    if (isSectionTitle(lines, i, lastNum)) { e = i; break }
+    // Règle de numérotation d'abord : la première ligne numérotée, ou le numéro suivant, est un élément de liste (jamais un titre).
     const n = /^(\d+)(?:\.\d+)*[.)]?\s+\S/.exec(lines[i].trim())
+    if (n && (lastNum === null || Number(n[1]) === lastNum + 1)) { lastNum = Number(n[1]); continue }
+    if (isSectionTitle(lines, i)) { e = i; break }
     if (n) lastNum = Number(n[1])
   }
   return [s, e]
