@@ -110,4 +110,17 @@ describe('github service', () => {
     })
     expect(calls.at(-1)?.url).toBe('https://api.github.com/repos/me/r/pulls?state=open&per_page=10')
   })
+  test('rootContents : noms et types', async () => {
+    const f = (body: string, status = 200): FetchLike => async () => ({ status, ok: status < 300, headers: { get: () => null }, text: async () => body })
+    expect(await createGithubService(f('[{"name":"Makefile","type":"file"},{"name":"src","type":"dir"}]'), () => 't').rootContents('me/r')).toEqual([{ name: 'Makefile', type: 'file' }, { name: 'src', type: 'dir' }])
+    expect(await createGithubService(f('[]'), () => 't').rootContents('me/r')).toEqual([])
+  })
+  test('rootContents : 404 et 403 lèvent (pas de faux « Makefile absent »)', async () => {
+    const f = (status: number): FetchLike => async () => ({ status, ok: false, headers: { get: () => null }, text: async () => '{}' })
+    await expect(createGithubService(f(404), () => 't').rootContents('me/r')).rejects.toThrow('GitHub HTTP 404')
+    await expect(createGithubService(f(403), () => 't').rootContents('me/r')).rejects.toThrow('GitHub HTTP 403')
+  })
+  test('rootContents : nom de dépôt invalide refusé', async () => {
+    await expect(svc.rootContents('../x')).rejects.toThrow()
+  })
 })

@@ -1,70 +1,47 @@
+import { join } from 'node:path'
+import { Worker } from 'node:worker_threads'
+
 export const MAX_PDF_BYTES = 20 * 1024 * 1024
-export const MAX_PDF_PAGES = 80
-const MIN_USEFUL_CHARS = 20
+export const PDF_TIMEOUT_MS = 20_000
+const KNOWN = ['PDF illisible', 'PDF trop long', 'Ce PDF ne contient pas de texte lisible']
 
-interface TextItem { str: string; transform: number[]; width: number }
-const isTextItem = (i: unknown): i is TextItem => !!i && typeof i === 'object' && typeof (i as TextItem).str === 'string' && Array.isArray((i as TextItem).transform)
-
-/** Regroupe les fragments d'une page en lignes (même position verticale), puis ordonne chaque ligne de gauche à droite. */
-function pageLines(items: TextItem[]): string[] {
-  const rows: { y: number; parts: TextItem[] }[] = []
-  for (const it of items) {
-    if (it.str === '') continue
-    const y = it.transform[5]
-    const row = rows.find((r) => Math.abs(r.y - y) <= 2)
-    if (row) row.parts.push(it)
-    else rows.push({ y, parts: [it] })
-  }
-  rows.sort((a, b) => b.y - a.y)
-  return rows
-    .map((r) => {
-      let line = ''
-      let end = -Infinity
-      for (const p of r.parts.sort((a, b) => a.transform[4] - b.transform[4])) {
-        const x = p.transform[4]
-        if (line && !/\s$/.test(line) && !/^\s/.test(p.str) && x - end > 1) line += ' '
-        line += p.str
-        end = x + (p.width || 0)
-      }
-      return line.trim()
-    })
-    .filter((l) => l !== '')
+export interface ExtractOptions {
+  /** Chemin du worker compilé (défaut : `pdfWorker.js` à côté du bundle principal). */
+  workerPath?: string
+  timeoutMs?: number
 }
 
 /**
- * Texte d'un PDF, une ligne par ligne visuelle. Aucun script du PDF n'est évalué (`isEvalSupported: false`) ;
- * taille et nombre de pages bornés. Les erreurs sont des messages destinés à l'utilisateur (jamais le contenu).
+ * Texte d'un PDF non fiable, extrait dans un worker_thread isolé (le fil principal ne parse jamais le PDF) :
+ * délai maximal, puis le worker est terminé. Erreurs : messages destinés à l'utilisateur, jamais le contenu.
  */
-export async function extractPdfText(buffer: Uint8Array): Promise<string> {
-  if (buffer.byteLength > MAX_PDF_BYTES) throw new Error('PDF trop gros')
-  // Build « legacy » Node de pdfjs (ESM) : import dynamique pour qu'il reste externe au bundle principal.
-  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
-  let doc: Awaited<ReturnType<typeof pdfjs.getDocument>['promise']>
-  // pdfjs 6 n'évalue plus de code (l'option `isEvalSupported` a disparu des types) ; on la garde à false par défense en profondeur.
-  const params = { data: new Uint8Array(buffer), isEvalSupported: false, disableFontFace: true, useSystemFonts: false, verbosity: 0 }
-  const task = pdfjs.getDocument(params)
-  try {
-    doc = await task.promise
-  } catch {
-    await task.destroy().catch(() => undefined)
-    throw new Error('PDF illisible')
-  }
-  try {
-    if (doc.numPages > MAX_PDF_PAGES) throw new Error('PDF trop long')
-    const lines: string[] = []
-    for (let n = 1; n <= doc.numPages; n++) {
-      const page = await doc.getPage(n)
-      const content = await page.getTextContent()
-      lines.push(...pageLines((content.items as unknown[]).filter(isTextItem)))
-      page.cleanup()
+export function extractPdfText(buffer: Uint8Array, opts: ExtractOptions = {}): Promise<string> {
+  if (buffer.byteLength > MAX_PDF_BYTES) return Promise.reject(new Error('PDF trop gros'))
+  return new Promise((resolve, reject) => {
+    let settled = false
+    let worker: Worker
+    const finish = (fn: () => void): void => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      void worker?.terminate()
+      fn()
     }
-    const text = lines.join('\n')
-    if (text.replace(/\s/g, '').length < MIN_USEFUL_CHARS) throw new Error('Ce PDF ne contient pas de texte lisible')
-    return text
-  } catch (err) {
-    if (err instanceof Error && (err.message === 'PDF trop long' || err.message === 'Ce PDF ne contient pas de texte lisible')) throw err
-    throw new Error('PDF illisible')
-  } finally {
-    await task.destroy().catch(() => undefined)
-  }
+    const timer = setTimeout(() => finish(() => reject(new Error('PDF illisible'))), opts.timeoutMs ?? PDF_TIMEOUT_MS)
+    try {
+      worker = new Worker(opts.workerPath ?? join(__dirname, 'pdfWorker.js'), { resourceLimits: { maxOldGenerationSizeMb: 512 } })
+    } catch {
+      clearTimeout(timer)
+      reject(new Error('PDF illisible'))
+      return
+    }
+    worker.once('message', (m: { text?: unknown; error?: unknown }) =>
+      finish(() => (typeof m.text === 'string' ? resolve(m.text) : reject(new Error(KNOWN.includes(m.error as string) ? (m.error as string) : 'PDF illisible'))))
+    )
+    worker.once('error', () => finish(() => reject(new Error('PDF illisible'))))
+    worker.once('exit', () => finish(() => reject(new Error('PDF illisible'))))
+    // Copie transférée : l'appelant garde son tampon.
+    const copy = buffer.slice().buffer
+    worker.postMessage(copy, [copy])
+  })
 }

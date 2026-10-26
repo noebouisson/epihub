@@ -12,6 +12,8 @@ export const validItemId = (v: unknown): v is string => typeof v === 'string' &&
 export const sanitizeKey = (key: string): string =>
   key.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 120) || '_'
 
+export const MAX_DONE = 500
+
 export interface PlanStore {
   getSubject(key: string): StoredSubject | null
   saveSubject(key: string, fileName: string, pdf: Uint8Array, text: string, info: SubjectInfo): void
@@ -77,6 +79,7 @@ export function createPlanStore(userData: string): PlanStore {
       const plans = loadPlans()
       const current = plans.get(key) ?? []
       if (!validItemId(itemId)) return current
+      if (on && !current.includes(itemId) && current.length >= MAX_DONE) return current
       const next = on ? [...new Set([...current, itemId])] : current.filter((i) => i !== itemId)
       plans.set(key, next)
       mkdirSync(userData, { recursive: true })

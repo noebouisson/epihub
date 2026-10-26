@@ -1,5 +1,7 @@
 /** Mini-écrivain PDF pour les tests : une page par tableau de lignes, police Helvetica, xref exact. */
-export function makePdf(pages: string[][]): Uint8Array {
+export function makePdf(pages: string[][], opt: { size?: number; gap?: number } = {}): Uint8Array {
+  const size = opt.size ?? 12
+  const gap = opt.gap ?? 20
   const objs: string[] = []
   const n = pages.length
   // 1 catalogue, 2 pages, 3 police, puis (page, contenu) par page
@@ -8,7 +10,7 @@ export function makePdf(pages: string[][]): Uint8Array {
   objs[3] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>'
   pages.forEach((lines, i) => {
     const esc = (s: string) => s.replace(/[\\()]/g, '\\$&')
-    const stream = lines.map((l, k) => `BT /F1 12 Tf 50 ${750 - k * 20} Td (${esc(l)}) Tj ET`).join('\n')
+    const stream = lines.map((l, k) => `BT /F1 ${size} Tf 20 ${780 - k * gap} Td (${esc(l)}) Tj ET`).join('\n')
     objs[4 + i * 2] = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents ${5 + i * 2} 0 R /Resources << /Font << /F1 3 0 R >> >> >>`
     objs[5 + i * 2] = `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`
   })

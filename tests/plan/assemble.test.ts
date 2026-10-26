@@ -95,3 +95,9 @@ test('piste moulinette depuis le dernier rapport', async () => {
   expect(latestReport).toHaveBeenCalledWith('B-PSU-100/myls')
   expect(v.improvements.some((i) => i.source === 'moulinette' && i.text.includes('Corrige les fuites'))).toBe(true)
 })
+test('échec de la liste des projets : jamais de rejet', async () => {
+  const a = make({ projects: async () => { throw new Error('refresh') } })
+  expect(await a.view('B-PSU-100/myls')).toBeNull()
+  expect(await a.canonicalKey('B-PSU-100/myls')).toBeNull()
+  expect(await a.summaries()).toEqual({})
+})

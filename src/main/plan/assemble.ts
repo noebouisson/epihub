@@ -41,9 +41,12 @@ export function createPlanAssembler(deps: PlanAssemblerDeps): PlanAssembler {
     }
   }
 
+  /** Une erreur de rafraîchissement ne fait jamais échouer l'IPC : liste vide. */
+  const projectList = (): Promise<ProjectSummary[]> => deps.projects().catch(() => [])
+
   async function project(key: unknown): Promise<ProjectSummary | null> {
     if (typeof key !== 'string') return null
-    const p = findProject(await deps.projects(), key)
+    const p = findProject(await projectList(), key)
     return p && p.status === 'en-cours' ? p : null
   }
 
@@ -87,7 +90,7 @@ export function createPlanAssembler(deps: PlanAssemblerDeps): PlanAssembler {
     async summaries() {
       const out: Record<string, PlanSummary> = {}
       const now = deps.now()
-      for (const p of await deps.projects()) {
+      for (const p of await projectList()) {
         if (p.status !== 'en-cours') continue
         const stored = deps.store.getSubject(p.key)
         if (!stored) {

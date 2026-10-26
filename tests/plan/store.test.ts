@@ -62,3 +62,8 @@ test('itemId invalide refusé', () => {
   expect(validItemId('../x')).toBe(false)
   expect(validItemId(42)).toBe(false)
 })
+test('plafond de 500 items cochés par projet', () => {
+  for (let i = 0; i < 520; i++) s.toggle('k', `x#${i}`, true)
+  expect(s.done('k')).toHaveLength(500)
+  expect(s.toggle('k', 'x#0', false)).toHaveLength(499)
+})

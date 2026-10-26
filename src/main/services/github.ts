@@ -107,9 +107,8 @@ export function createGithubService(
     recentCommits: (fullName, branch) => commitsOf(fullName, branch, 5),
     async rootContents(fullName): Promise<{ name: string; type: 'file' | 'dir' }[]> {
       if (!/^[\w.-]+\/[\w.-]+$/.test(fullName)) throw new Error('GitHub: dépôt invalide')
-      // 404 : dépôt vide ou inaccessible (liste vide) ; l'appelant traite une erreur comme « pas de contrôle ».
-      const list = await get(`/repos/${fullName}/contents`, [404])
-      if (list === null) return []
+      // 404/403 (dépôt introuvable ou inaccessible) lèvent une erreur : l'appelant n'émet alors aucune piste repo.
+      const list = await get(`/repos/${fullName}/contents`)
       if (!Array.isArray(list)) throw new Error('GitHub: réponse inattendue')
       return list.map((e) => ({ name: String(e.name), type: e.type === 'dir' ? ('dir' as const) : ('file' as const) }))
     },
