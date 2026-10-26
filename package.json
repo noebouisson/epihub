@@ -13,7 +13,8 @@
     "build": "electron-vite build",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
-    "dist": "electron-vite build && electron-builder --linux AppImage deb"
+    "dist": "electron-vite build && electron-builder --linux AppImage deb",
+    "smoke:pdf": "node scripts/smoke-pdf.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",
@@ -32,6 +33,6 @@
   },
   "homepage": "https://github.com/noebouisson/epihub",
   "dependencies": {
-    "pdfjs-dist": "6.3.289"
+    "pdfjs-dist": "4.10.38"
   }
 }

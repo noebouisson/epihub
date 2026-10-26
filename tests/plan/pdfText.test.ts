@@ -1,9 +1,11 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { build } from 'esbuild'
 import { beforeAll, expect, test } from 'vitest'
+import { pageLines } from '../../src/main/plan/pdfCore'
 import { extractPdfText as extract } from '../../src/main/plan/pdfText'
+import { parseSubject } from '../../src/main/plan/subject'
 import { makePdf } from './makePdf'
 
 // Le worker TypeScript est compilé une fois (pdfjs reste externe, comme dans le build de l'app).
@@ -66,4 +68,44 @@ test('le tampon de l’appelant reste utilisable', async () => {
   const b = sample()
   await extractPdfText(b)
   expect(b.byteLength).toBeGreaterThan(0)
+})
+
+// Fragment de texte pdfjs : x, y, hauteur de police.
+const item = (str: string, x: number, y: number, h = 12) => ({ str, transform: [h, 0, 0, h, x, y], width: str.length * h * 0.5 })
+
+test('pageLines : ligne vide quand l’écart vertical dépasse 1,5 × l’écart médian', () => {
+  const items = [item('A one', 20, 700), item('B two', 20, 686), item('C three', 20, 672), item('D four', 20, 640), item('E five', 20, 626)]
+  expect(pageLines(items)).toEqual(['A one', 'B two', 'C three', '', 'D four', 'E five'])
+})
+test('pageLines : à défaut d’écart médian, 1,5 × la hauteur de police', () => {
+  expect(pageLines([item('A one', 20, 700), item('B two', 20, 640)])).toEqual(['A one', '', 'B two'])
+  expect(pageLines([item('A one', 20, 700), item('B two', 20, 686)])).toEqual(['A one', 'B two'])
+})
+test('pageLines : les numéros de page seuls sont retirés', () => {
+  const items = [item('A one', 20, 700), item('B two', 20, 686), item('C three', 20, 672), item('3', 300, 40)]
+  expect(pageLines(items)).toEqual(['A one', 'B two', 'C three'])
+})
+test('pages séparées par une ligne vide', async () => {
+  const lines = (await extractPdfText(makePdf([['Page one has text'], ['Page two has text']]))).split('\n')
+  expect(lines).toEqual(['Page one has text', '', 'Page two has text'])
+})
+
+test('de bout en bout : PDF (vrai worker) → parseSubject identique au texte', async () => {
+  const txt = readFileSync(join(__dirname, '../fixtures/subjects/my_ls_en.txt'), 'utf8')
+  // Une page par section (titre en majuscules), Helvetica ne sait pas écrire « ∼ » : « ~ » dans le PDF.
+  const pages: string[][] = [[]]
+  for (const l of txt.replace(/\n+$/, '').split('\n')) {
+    if (/^(OPTIONS|BONUS)$/.test(l)) pages.push([])
+    pages[pages.length - 1].push(l.replace(/∼/g, '~'))
+  }
+  pages.forEach((p, i) => { while (p.length > 0 && p[p.length - 1] === '') p.pop(); p.push('', '', String(i + 1)) })
+  const fromPdf = parseSubject(await extractPdfText(makePdf(pages, { size: 10, gap: 14 })))
+  const fromTxt = parseSubject(txt)
+  const pick = (i: typeof fromTxt) => ({
+    binaryName: i.binaryName, makefileRules: i.makefileRules, authorizedFunctions: i.authorizedFunctions, options: i.options,
+    errorCode84: i.errorCode84, unitTests: i.unitTests, examples: i.examples.length, bonus: i.bonus
+  })
+  expect(pick(fromPdf)).toEqual(pick(fromTxt))
+  expect(fromTxt.authorizedFunctions).toHaveLength(16)
+  expect(fromTxt.examples).toHaveLength(2)
 })
