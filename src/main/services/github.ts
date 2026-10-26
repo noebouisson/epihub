@@ -10,6 +10,15 @@ function webUrl(subjectUrl: string | null | undefined, fallback: string): string
   return `https://github.com/${m[1]}/${m[2] === 'pulls' ? 'pull' : 'issues'}/${m[3]}`
 }
 
+/** Corps d'erreur GitHub d'un dépôt sans aucun commit. */
+function emptyRepo(body: string): boolean {
+  try {
+    return /repository is empty/i.test(String((JSON.parse(body) as { message?: unknown }).message ?? ''))
+  } catch {
+    return false
+  }
+}
+
 const repoFromApiUrl = (u: string): string => u.replace(/^https:\/\/api\.github\.com\/repos\//, '')
 
 export function createGithubService(
@@ -23,8 +32,8 @@ export function createGithubService(
 } {
   const cache = new Map<string, { etag: string; body: string }>()
 
-  /** Renvoie le JSON décodé, ou null si le statut fait partie de `nullOn`. */
-  async function get(path: string, nullOn: readonly number[] = []): Promise<any> {
+  /** Renvoie le JSON décodé, ou null si le statut fait partie de `nullOn` (ou si `nullIf` accepte le corps de l'erreur). */
+  async function get(path: string, nullOn: readonly number[] = [], nullIf?: (status: number, body: string) => boolean): Promise<any> {
     const token = getToken()
     if (!token) throw new NeedsLoginError('Token GitHub manquant')
     const url = API + path
@@ -39,7 +48,10 @@ export function createGithubService(
     if (res.status === 401) throw new NeedsLoginError('Token GitHub invalide')
     if (res.status === 304 && cached) return JSON.parse(cached.body)
     if (nullOn.includes(res.status)) return null
-    if (!res.ok) throw new Error(`GitHub HTTP ${res.status}`)
+    if (!res.ok) {
+      if (nullIf && nullIf(res.status, await res.text().catch(() => ''))) return null
+      throw new Error(`GitHub HTTP ${res.status}`)
+    }
     const body = await res.text()
     const etag = res.headers.get('etag')
     if (etag) cache.set(url, { etag, body })
@@ -107,8 +119,9 @@ export function createGithubService(
     recentCommits: (fullName, branch) => commitsOf(fullName, branch, 5),
     async rootContents(fullName): Promise<{ name: string; type: 'file' | 'dir' }[]> {
       if (!/^[\w.-]+\/[\w.-]+$/.test(fullName)) throw new Error('GitHub: dépôt invalide')
-      // 404/403 (dépôt introuvable ou inaccessible) lèvent une erreur : l'appelant n'émet alors aucune piste repo.
-      const list = await get(`/repos/${fullName}/contents`)
+      // Dépôt vide (409, ou 404 « This repository is empty ») → aucune entrée : les pistes Makefile/push restent utiles.
+      // Autres 404/403 (dépôt introuvable ou inaccessible) : erreur, l'appelant n'émet alors aucune piste repo.
+      const list = (await get(`/repos/${fullName}/contents`, [409], (status, body) => status === 404 && emptyRepo(body))) ?? []
       if (!Array.isArray(list)) throw new Error('GitHub: réponse inattendue')
       return list.map((e) => ({ name: String(e.name), type: e.type === 'dir' ? ('dir' as const) : ('file' as const) }))
     },

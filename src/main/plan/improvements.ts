@@ -2,6 +2,8 @@ import type { Improvement, PlanStep, Report, RepoCheck, SubjectInfo } from '../.
 import { dayLabel, planStatus } from './plan'
 
 const DAY = 86_400_000
+/** Au-delà, les étapes en retard sont regroupées en une seule piste. */
+const MAX_LATE_DETAILED = 3
 const SOURCE_ORDER = { moulinette: 0, repo: 1, temps: 2 } as const
 
 const isForbidden = (name: string, binaryName: string | null): boolean =>
@@ -46,7 +48,11 @@ export function improvements(i: {
     out.push({ source: 'temps', priority: 1, text: 'Ajoute le sujet (PDF) pour obtenir la marche à suivre' })
   } else {
     const status = planStatus(i.steps, i.done, i.now)
-    for (const s of status.late) out.push({ source: 'temps', priority: 2, text: `Étape « ${s.title} » en retard (prévue le ${dayLabel(s.target!)})` })
+    if (status.late.length > MAX_LATE_DETAILED) {
+      out.push({ source: 'temps', priority: 2, text: `${status.late.length} étapes en retard : ${status.late.slice(0, MAX_LATE_DETAILED).map((s) => s.title).join(', ')}…` })
+    } else {
+      for (const s of status.late) out.push({ source: 'temps', priority: 2, text: `Étape « ${s.title} » en retard (prévue le ${dayLabel(s.target!)})` })
+    }
     const done = new Set(i.done)
     const bi = i.steps.findIndex((s) => s.id === 'bonus')
     if (bi > 0 && i.steps[bi].items.some((it) => done.has(it.id)) && i.steps.slice(0, bi).some((s) => s.items.some((it) => !done.has(it.id)))) {

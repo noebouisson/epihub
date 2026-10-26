@@ -63,3 +63,16 @@ test('pas de sujet → P1 « Ajoute le sujet (PDF) pour obtenir la marche à sui
   expect(r.at(0)).toMatchObject({ priority: 1, source: 'temps', text: 'Ajoute le sujet (PDF) pour obtenir la marche à suivre' })
   expect(r).toHaveLength(2)
 })
+
+test('plus de 3 étapes en retard → une seule piste P2 groupée', () => {
+  const later = new Date('2026-11-03T10:00:00')
+  const late = improvements({ ...base, now: later }).filter((i) => i.source === 'temps')
+  expect(late).toHaveLength(1)
+  expect(late[0].priority).toBe(2)
+  expect(late[0].text).toMatch(/^\d+ étapes en retard : Mise en place, Cas de base, Option -a…$/)
+})
+test('3 étapes en retard ou moins → une piste par étape', () => {
+  const s3 = steps.slice(0, 3)
+  const late = improvements({ ...base, steps: s3, now: new Date('2026-11-03T10:00:00') }).filter((i) => i.source === 'temps')
+  expect(late.map((i) => i.text)).toEqual([0, 1, 2].map((k) => `Étape « ${s3[k].title} » en retard (prévue le ${s3[k].target!.slice(8, 10)}/${s3[k].target!.slice(5, 7)})`))
+})

@@ -120,6 +120,13 @@ describe('github service', () => {
     await expect(createGithubService(f(404), () => 't').rootContents('me/r')).rejects.toThrow('GitHub HTTP 404')
     await expect(createGithubService(f(403), () => 't').rootContents('me/r')).rejects.toThrow('GitHub HTTP 403')
   })
+  test('rootContents : dépôt vide (409 ou 404 « This repository is empty ») → liste vide', async () => {
+    const f = (status: number, body: string): FetchLike => async () => ({ status, ok: false, headers: { get: () => null }, text: async () => body })
+    expect(await createGithubService(f(409, '{"message":"Git Repository is empty."}'), () => 't').rootContents('me/r')).toEqual([])
+    expect(await createGithubService(f(404, '{"message":"This repository is empty."}'), () => 't').rootContents('me/r')).toEqual([])
+    await expect(createGithubService(f(404, '{"message":"Not Found"}'), () => 't').rootContents('me/r')).rejects.toThrow('GitHub HTTP 404')
+    await expect(createGithubService(f(404, 'pas du json'), () => 't').rootContents('me/r')).rejects.toThrow('GitHub HTTP 404')
+  })
   test('rootContents : nom de dépôt invalide refusé', async () => {
     await expect(svc.rootContents('../x')).rejects.toThrow()
   })

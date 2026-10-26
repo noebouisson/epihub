@@ -2,12 +2,12 @@ import { findProject } from '../../shared/projects'
 import type { PlanStep, PlanSummary, PlanView, ProjectSummary, Report, RepoCheck, SubjectInfo } from '../../shared/types'
 import { evaluateRepo, improvements } from './improvements'
 import { buildPlan, planStatus } from './plan'
-import type { PlanStore } from './store'
+import type { PlanStore, SubjectMeta } from './store'
 
 const REPO_TTL = 10 * 60_000
 
 export interface PlanAssemblerDeps {
-  store: Pick<PlanStore, 'getSubject' | 'done'>
+  store: Pick<PlanStore, 'getSubjectMeta' | 'done'>
   projects(): Promise<ProjectSummary[]>
   latestReport(key: string): Report | null
   rootContents?(fullName: string): Promise<{ name: string; type: 'file' | 'dir' }[]>
@@ -50,8 +50,9 @@ export function createPlanAssembler(deps: PlanAssemblerDeps): PlanAssembler {
     return p && p.status === 'en-cours' ? p : null
   }
 
-  function stepsFor(p: ProjectSummary, info: SubjectInfo | null): PlanStep[] {
-    return info ? buildPlan(info, { start: null, end: p.deadline?.end ?? null, now: deps.now() }) : []
+  /** Plan figé à l'import (dates calculées depuis `importedAt`) : il ne glisse pas chaque jour et « En retard » peut apparaître ; un réimport replanifie. */
+  function stepsFor(p: ProjectSummary, stored: SubjectMeta | null): PlanStep[] {
+    return stored ? buildPlan(stored.info, { start: null, end: p.deadline?.end ?? null, now: new Date(stored.importedAt) }) : []
   }
 
   return {
@@ -62,9 +63,9 @@ export function createPlanAssembler(deps: PlanAssemblerDeps): PlanAssembler {
     async view(key) {
       const p = await project(key)
       if (!p) return null
-      const stored = deps.store.getSubject(p.key)
+      const stored = deps.store.getSubjectMeta(p.key)
       const info = stored?.info ?? null
-      const steps = stepsFor(p, info)
+      const steps = stepsFor(p, stored)
       const ids = new Set(steps.flatMap((s) => s.items.map((i) => i.id)))
       // Après un réimport, les items disparus du plan sont ignorés.
       const done = deps.store.done(p.key).filter((id) => ids.has(id))
@@ -92,12 +93,12 @@ export function createPlanAssembler(deps: PlanAssemblerDeps): PlanAssembler {
       const now = deps.now()
       for (const p of await projectList()) {
         if (p.status !== 'en-cours') continue
-        const stored = deps.store.getSubject(p.key)
+        const stored = deps.store.getSubjectMeta(p.key)
         if (!stored) {
           out[p.key] = { hasSubject: false, current: null, late: false, progress: 0 }
           continue
         }
-        const steps = stepsFor(p, stored.info)
+        const steps = stepsFor(p, stored)
         const st = planStatus(steps, deps.store.done(p.key), now)
         out[p.key] = { hasSubject: true, current: st.current ? { title: st.current.title, target: st.current.target } : null, late: st.late.length > 0, progress: st.progress }
       }

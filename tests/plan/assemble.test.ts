@@ -7,12 +7,12 @@ import { createPlanStore } from '../../src/main/plan/store'
 import { parseSubject } from '../../src/main/plan/subject'
 import type { ProjectSummary, Report } from '../../src/shared/types'
 
+const now = new Date('2026-10-26T10:00:00')
 let dir: string
 let store: ReturnType<typeof createPlanStore>
-beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'asm-')); store = createPlanStore(dir) })
+beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'asm-')); store = createPlanStore(dir, { now: () => now.getTime() }) })
 afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
-const now = new Date('2026-10-26T10:00:00')
 const summary = (o: Partial<ProjectSummary> = {}): ProjectSummary => ({
   key: 'B-PSU-100/myls', aliases: ['B-PSU-100/psu100myls'], projectId: '1', title: 'my_ls', moduleCode: 'B-PSU-100',
   deadline: { id: 'd', moduleCode: 'B-PSU-100', projectCode: 'x', title: 'my_ls', end: '2026-11-06T18:42:00', url: '', repo: null, lastCommit: null, alert: null, manual: false },
@@ -100,4 +100,26 @@ test('échec de la liste des projets : jamais de rejet', async () => {
   expect(await a.view('B-PSU-100/myls')).toBeNull()
   expect(await a.canonicalKey('B-PSU-100/myls')).toBeNull()
   expect(await a.summaries()).toEqual({})
+})
+
+test('plan figé à l’import : 5 jours plus tard, mêmes dates et étapes en retard', async () => {
+  import_()
+  const v0 = (await make().view('B-PSU-100/myls'))!
+  expect(v0.status.late).toEqual([])
+  const later = new Date(now.getTime() + 5 * 86_400_000)
+  const a = make({ now: () => later })
+  const v5 = (await a.view('B-PSU-100/myls'))!
+  expect(v5.steps.map((s) => s.target)).toEqual(v0.steps.map((s) => s.target))
+  expect(v5.status.late.length).toBeGreaterThan(0)
+  expect(v5.improvements.some((i) => i.source === 'temps' && /retard/.test(i.text))).toBe(true)
+  const sum = (await a.summaries())['B-PSU-100/myls']
+  expect(sum.late).toBe(true)
+  expect(sum.current!.target).toBe(v0.steps[0].target)
+})
+test('summaries ne relit pas le texte du sujet', async () => {
+  import_()
+  const spy = vi.spyOn(store, 'getSubject')
+  await make().summaries()
+  await make().view('B-PSU-100/myls')
+  expect(spy).not.toHaveBeenCalled()
 })
