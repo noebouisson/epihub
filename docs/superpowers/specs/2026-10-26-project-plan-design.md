@@ -27,8 +27,8 @@ IA ; OCR des PDF scannés (un PDF sans texte → message « Ce PDF ne contient p
 
 - Bouton « Ajouter le sujet (PDF) » (page projet, projets en cours) → boîte de dialogue système (filtre PDF) ouverte par le processus principal.
 - Limites : 20 Mo, 80 pages ; au-delà ou en cas d'erreur → message clair, rien n'est stocké.
-- Extraction du texte avec `pdfjs-dist` (dépendance de production, externalisée du bundle main, version publiée depuis au moins deux semaines), dans le processus principal, sans exécuter de script du PDF (`isEvalSupported: false`). Les lignes sont reconstruites dans l'ordre de lecture (regroupement par position verticale).
-- Stockage : `userData/subjects/<clé nettoyée>.pdf` (copie) et `userData/subjects/<clé nettoyée>.json` = `{ projectKey, fileName, importedAt, text, info }`. « Remplacer » réimporte, « Retirer le sujet » supprime les deux fichiers.
+- Extraction du texte avec `pdfjs-dist` **4.10.38** exactement (dépendance de production, externalisée du bundle main ; la 5.x exige `DOMMatrix`, la 6.x fait planter Electron 33), dans un worker_thread du processus principal avec délai maximal, sans exécuter de script du PDF (`isEvalSupported: false`). Les lignes sont reconstruites dans l'ordre de lecture (regroupement par position verticale) ; une ligne vide marque un écart vertical > 1,5 × l'écart médian de la page (à défaut 1,5 × la hauteur de police) et sépare les pages ; les numéros de page seuls sont retirés. `npm run smoke:pdf` vérifie l'extraction dans le vrai Electron (dev et asar).
+- Stockage : `userData/subjects/<clé nettoyée>.pdf` (copie), `userData/subjects/<clé nettoyée>.json` = `{ projectKey, fileName, importedAt, text, info }` et la fiche légère `<clé nettoyée>.info.json` = `{ projectKey, fileName, importedAt, info, textHash }` (lue par la vue et le tableau de bord, sans le texte). « Remplacer » réimporte (un texte différent efface les cases cochées du projet), « Retirer le sujet » supprime les fichiers et les cases cochées.
 
 ## 4. Analyse du sujet (`parseSubject(text) → SubjectInfo`, pur)
 
@@ -47,10 +47,12 @@ interface SubjectInfo {
 ```
 
 Règles (insensibles à la casse, anglais et français) :
-- Champs « clé : valeur » : `Binary name|Nom du binaire`, `Language|Langage`, `Repository name|Nom du dépôt`, `Compilation`, `Authorized functions|Fonctions autorisées` (valeur sur la ligne et les lignes suivantes jusqu'à une ligne vide ou un nouveau champ ; séparateurs `,` `;` espaces ; noms `[A-Za-z_][A-Za-z0-9_]*` sans parenthèses ; `libc`, `all` gardés tels quels).
+- Champs « clé : valeur » : `Binary name|Nom du binaire`, `Language|Langage`, `Repository name|Nom du dépôt`, `Compilation`, `Authorized functions|Fonctions autorisées` (valeur sur la ligne et les lignes suivantes tant qu'elles ne contiennent que des identifiants séparés par des virgules — arrêt à une ligne vide, un nouveau champ, un titre ou une phrase ; séparateurs `,` `;` espaces ; noms `[A-Za-z_][A-Za-z0-9_]*` sans parenthèses ; `libc`, `all` gardés tels quels).
 - `makefileRules` : mots `re`, `clean`, `fclean`, `all`, `tests_run` cités dans la ligne Compilation.
 - `forbidden` : fonctions citées dans les phrases contenant `forbidden|interdit`.
 - `options` : lignes qui commencent par un drapeau `-x` / `-xy` / `--long` suivi d'une description ; dédupliquées dans l'ordre.
+- Blocs d'exemple : de l'invite jusqu'à la prochaine invite, un titre de section ou une phrase (point final, ≥ 5 mots, pas de drapeau en tête), lignes vides comprises ; un écran d'aide (première ligne de sortie en MAJUSCULES, ex. `USAGE`) garde ses titres internes. Les drapeaux d'un exemple ne sont jamais des options.
+- Lignes composées uniquement de chiffres (numéros de page) ignorées ; puces `✓` `✔` `•` retirées en début de ligne.
 - `errorCode84` : présence de `84` dans une phrase contenant `exit|return|code|retour|erreur|error`.
 - `unitTests` : `unit test|tests unitaires|criterion|tests_run`.
 - `bonus` : lignes après un titre `Bonus` (jusqu'au titre suivant ou la fin), limitées à 30.
@@ -66,15 +68,15 @@ interface PlanStep { id: string; title: string; details: string; items: PlanItem
 Étapes, dans l'ordre (une étape vide est omise) :
 1. `setup` « Mise en place » : dépôt `<repoName>` ; Makefile avec les règles `<makefileRules>` ; binaire nommé exactement `<binaryName>` ; `.gitignore` (binaires, `*.o`, `vgcore.*`).
 2. `base` « Cas de base » : faire fonctionner le premier exemple ; respecter les fonctions autorisées (liste).
-3. Une étape par option : `option:<flag>` « Option <flag> » (description du sujet) ; si aucune option : une étape `features` « Fonctionnalités demandées » avec les exigences (max 12 items).
-4. `errors` « Gestion des erreurs » : code de retour 84 si `errorCode84` ; messages sur la sortie d'erreur ; cas limites (fichier inexistant, arguments invalides).
+3. Une étape par option : `option:<flag>` « Option <flag> » (description du sujet) ; si aucune option : une étape `features` « Fonctionnalités demandées » avec les exigences (max 12 items), hors consignes communes Epitech (« totality of your source files », « bonus files », « Error messages have to be written », « must be compiled using »), qui restent dans `requirements`.
+4. `errors` « Gestion des erreurs » : code de retour 84 si `errorCode84` ; messages sur la sortie d'erreur ; « Gérer les cas limites (par ex. fichier inexistant, arguments invalides) ».
 5. `tests` « Tests » : reproduire chaque exemple ; tests unitaires Criterion + règle `tests_run` si `unitTests`.
 6. `finish` « Finition » : coding style ; `make re` sur un clone propre ; vérifier qu'aucun binaire/`.o` n'est poussé.
 7. `bonus` « Bonus » (si `bonus` non vide) : items = lignes bonus (max 10), avec la mention « Seulement quand tout le reste est fait ».
 
 Identifiants stables : `step.id` comme ci-dessus ; `item.id = <step.id>#<index>`.
 
-Dates cibles : poids `setup 1`, `base 2`, chaque option `1.5`, `features 3`, `errors 1`, `tests 1.5`, `finish 0.5`, `bonus 1`. Le temps disponible va de `max(start, now)` à `end − 1 jour` ; chaque étape reçoit une date de fin proportionnelle au cumul des poids, arrondie au jour (heure locale). Si `end` est passé ou absent → `target: null` partout.
+Dates cibles : poids `setup 1`, `base 2`, chaque option `1.5`, `features 3`, `errors 1`, `tests 1.5`, `finish 0.5`, `bonus 1`. Le temps disponible va de `max(start, now)` à `end − 1 jour` ; chaque étape reçoit une date de fin proportionnelle au cumul des poids, arrondie au jour (heure locale). Si `end` est passé ou absent → `target: null` partout. Le plan est figé à l'import : `now` = `importedAt` du sujet (`start: null`), les dates ne glissent donc pas d'un jour à l'autre ; un réimport replanifie. `planStatus` et les pistes utilisent l'heure réelle.
 
 ## 6. Avancement (`planStatus(steps, done, now)`, pur)
 
@@ -97,12 +99,12 @@ interface Improvement { source: 'moulinette' | 'repo' | 'temps'; priority: 1 | 2
   - fichiers interdits à la racine : `*.o`, `*.a`, `a.out`, `vgcore.*`, fichier nommé `<binaryName>` → P1 (liste) ;
   - sujet `unitTests` et pas de dossier `tests` à la racine → P2.
 - **temps** :
-  - chaque étape en retard → P2 « Étape « X » en retard (prévue le JJ/MM) » ;
+  - chaque étape en retard → P2 « Étape « X » en retard (prévue le JJ/MM) » ; plus de 3 étapes en retard → une seule P2 « N étapes en retard : A, B, C… » ;
   - étape bonus commencée alors qu'une étape précédente n'est pas finie → P3 « Termine la partie obligatoire avant le bonus » ;
   - aucun sujet importé → P1 « Ajoute le sujet (PDF) pour obtenir la marche à suivre ».
 - Tri par priorité puis source (`moulinette`, `repo`, `temps`).
 
-Contrôle du repo : `GET /repos/{fullName}/contents` (liste de la racine : noms et types) + `pushedAt` déjà connu ; best-effort, en cache 10 min par repo ; erreur → pas de piste repo.
+Contrôle du repo : `GET /repos/{fullName}/contents` (liste de la racine : noms et types) + `pushedAt` déjà connu ; best-effort, en cache 10 min par repo ; dépôt vide (409, ou 404 « This repository is empty ») → racine vide ; autre erreur → pas de piste repo.
 
 ## 8. Interface
 
