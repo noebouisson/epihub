@@ -4,6 +4,9 @@ const DAY = 86_400_000
 const MAX_FEATURES = 12
 const MAX_BONUS = 10
 
+/** Consignes communes à tous les sujets Epitech : gardées dans `requirements`, pas dans l'étape Fonctionnalités. */
+const BOILERPLATE = /totality of your source files|bonus files|error messages have to be written|must be compiled using/i
+
 const WEIGHTS = { setup: 1, base: 2, option: 1.5, features: 3, errors: 1, tests: 1.5, finish: 0.5, bonus: 1 }
 
 /** Jour calendaire local de `d`, en millisecondes UTC (minuit) : l'arithmétique en jours évite les décalages d'heure d'été. */
@@ -46,14 +49,14 @@ export function buildPlan(info: SubjectInfo, w: { start: string | null; end: str
       add(mk(`option:${o.flag}`, `Option ${o.flag}`, o.description, [`Implémenter ${o.flag} : ${o.description}`, `Tester ${o.flag} seule puis combinée aux autres options`]), WEIGHTS.option)
     }
   } else {
-    const reqs = info.requirements.slice(0, MAX_FEATURES)
+    const reqs = info.requirements.filter((r) => !BOILERPLATE.test(r)).slice(0, MAX_FEATURES)
     add(mk('features', 'Fonctionnalités demandées', 'Les exigences relevées dans le sujet.', reqs.length > 0 ? reqs : ['Implémenter les fonctionnalités décrites dans le sujet']), WEIGHTS.features)
   }
 
   add(mk('errors', 'Gestion des erreurs', 'Un programme robuste échoue proprement.', [
     ...(info.errorCode84 ? ['Retourner 84 en cas d\'erreur'] : []),
     'Écrire les messages d\'erreur sur la sortie d\'erreur',
-    'Gérer les cas limites : fichier inexistant, arguments invalides'
+    'Gérer les cas limites (par ex. fichier inexistant, arguments invalides)'
   ]), WEIGHTS.errors)
 
   const tests = [

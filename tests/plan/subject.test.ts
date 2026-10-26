@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { expect, test } from 'vitest'
+import { buildPlan } from '../../src/main/plan/plan'
 import { parseSubject } from '../../src/main/plan/subject'
 
 const read = (f: string) => readFileSync(join(__dirname, '../fixtures/subjects', f), 'utf8')
@@ -101,8 +102,9 @@ test('options : formes -l, --long, puces, drapeau seul', () => {
 })
 test('fonctions écrites name()', () => expect(parseSubject('Authorized functions: open(), read(), close()').authorizedFunctions).toEqual(['open', 'read', 'close']))
 test('un bloc d’exemple n’est jamais fondu dans une phrase', () => {
-  const i = parseSubject('The program must work\n\n~/x> ./a\nok\nmust not appear\n\nIt should end.')
-  expect(i.requirements).toEqual(['The program must work', 'It should end.'])
+  // Le bloc reste ouvert jusqu'à une phrase (≥ 5 mots, point final) ou un titre de section.
+  const i = parseSubject('The program must work\n\n~/x> ./a\nok\nmust not appear\n\nIt should end after that.')
+  expect(i.requirements).toEqual(['The program must work', 'It should end after that.'])
   expect(i.examples).toEqual(['~/x> ./a\nok\nmust not appear'])
 })
 
@@ -118,4 +120,34 @@ test('bonus numéroté en majuscules conservé', () => {
   expect(parseSubject('Bonus\n1. COLORS\n2. SIZES').bonus).toEqual(['1. COLORS', '2. SIZES'])
   expect(parseSubject('Bonus\n1. COLORS\n\n2. SIZES\n\nEXAMPLES\nx').bonus).toEqual(['1. COLORS', '2. SIZES'])
   expect(parseSubject('Bonus\n3. COLORS\n4. SIZES').bonus).toEqual(['3. COLORS', '4. SIZES'])
+})
+
+test('fonctions autorisées : la liste s’arrête à la première ligne qui n’en est pas une', () => {
+  expect(parseSubject('Authorized functions: open, read,\nclose, write\nThe program must work with any file given.').authorizedFunctions).toEqual(['open', 'read', 'close', 'write'])
+  expect(parseSubject('Authorized functions: open, read\nDESCRIPTION\nYour program must list files.').authorizedFunctions).toEqual(['open', 'read'])
+  expect(parseSubject('Authorized functions: malloc, free and exit\nSee below').authorizedFunctions).toEqual(['malloc', 'free', 'exit'])
+  expect(parseSubject('Authorized functions: open, read\ncurrent directory when no argument is given.').authorizedFunctions).toEqual(['open', 'read'])
+})
+test('un bloc d’exemple se termine aussi à un titre de section', () => {
+  const i = parseSubject('~/x> ./a -l\nok\nOPTIONS\n-a show all entries')
+  expect(i.examples).toEqual(['~/x> ./a -l\nok'])
+  expect(i.options).toEqual([{ flag: '-a', description: 'show all entries' }])
+})
+test('écran d’aide en exemple : aucune option, étape Fonctionnalités présente', () => {
+  const i = parseSubject(read('help_screen_en.txt'))
+  expect(i.options).toEqual([])
+  expect(i.examples).toHaveLength(1)
+  expect(i.requirements).toEqual(['The program must read the whole file given as argument.', 'Each line of the file must be printed in reverse order.'])
+  const ids = buildPlan(i, { start: null, end: '2026-11-06T18:42:00', now: new Date('2026-10-26T10:00:00') }).map((s) => s.id)
+  expect(ids).toContain('features')
+})
+test('puces ✓ ✔ • retirées des exigences', () => {
+  expect(parseSubject('✓ The program must compile.\n✔ The binary must be named x.\n• Errors must go to stderr.').requirements).toEqual([
+    'The program must compile.', 'The binary must be named x.', 'Errors must go to stderr.'
+  ])
+})
+test('numéros de page seuls ignorés partout', () => {
+  const i = parseSubject('The program must read the\n12\nwhole file.\nAuthorized functions: open,\n3\nread')
+  expect(i.requirements).toEqual(['The program must read the whole file.'])
+  expect(i.authorizedFunctions).toEqual(['open', 'read'])
 })

@@ -1,0 +1,20 @@
+REVERSER
+Print the lines of a file in reverse
+
+Binary name: reverser
+Language: C
+Compilation: via Makefile, including re, clean and fclean rules
+Authorized functions: open, read, write, close, malloc, free
+
+EXAMPLE
+
+~/B-CPE-100> ./reverser -h
+USAGE
+./reverser file
+
+DESCRIPTION
+-h display this help
+file the file to reverse
+
+The program must read the whole file given as argument.
+Each line of the file must be printed in reverse order.

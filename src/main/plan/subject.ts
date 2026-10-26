@@ -31,6 +31,12 @@ const LIBC = new Set(('printf fprintf sprintf snprintf dprintf vprintf vfprintf 
 /** Noms de la libc qui sont aussi des mots courants : acceptés seulement en liste (voir `cFunctions`). */
 const COMMON = new Set('free time system read write open close exit wait signal sleep kill pipe dup stat exec fork abort getline access link select'.split(' '))
 
+/** Ligne en MAJUSCULES courte, sans ponctuation finale (OPTIONS, USAGE…). */
+const isUpperTitle = (t: string): boolean => {
+  const letters = t.replace(/[^A-Za-zÀ-ÿ]/g, '')
+  return letters.length >= 3 && t.length <= 40 && t === t.toUpperCase() && !/[.:;,!?]$/.test(t)
+}
+
 const isTitle = (l: string): boolean => {
   const t = l.trim()
   if (/^#+\s+\S/.test(t) || /^\d+(\.\d+)*[.)]?\s+\S/.test(t)) return true
@@ -41,9 +47,7 @@ const isTitle = (l: string): boolean => {
 /** Vrai titre de section (fin de la partie Bonus) : `#`, MAJUSCULES sans ponctuation finale, ou titre numéroté court suivi d'une ligne vide. */
 function isSectionTitle(lines: string[], i: number): boolean {
   const t = lines[i].trim()
-  if (/^#+\s+\S/.test(t)) return true
-  const letters = t.replace(/[^A-Za-zÀ-ÿ]/g, '')
-  if (letters.length >= 3 && t.length <= 40 && t === t.toUpperCase() && !/[.:;,!?]$/.test(t)) return true
+  if (/^#+\s+\S/.test(t) || isUpperTitle(t)) return true
   const m = /^\d+(?:\.\d+)*[.)]?\s+(\S.*)$/.exec(t)
   if (!m || lines[i + 1] === undefined || lines[i + 1].trim() !== '' || /[.:;,!?]/.test(m[1])) return false
   const words = m[1].split(/\s+/)
@@ -59,14 +63,34 @@ const optionOf = (l: string): { flag: string; description: string } | null => {
 }
 const isOptionLine = (l: string): boolean => optionOf(l) !== null || BARE_FLAG.test(l)
 
-/** Lignes d'un bloc d'exemple : de l'invite jusqu'à la ligne vide suivante. */
-function exampleMask(lines: string[]): boolean[] {
-  let inside = false
-  return lines.map((l) => {
-    if (l.trim() === '') { inside = false; return false }
-    if (PROMPT.test(l)) inside = true
-    return inside
+/** Phrase de prose : se termine par un point, au moins 5 mots, ne commence pas par une option. */
+const isProse = (t: string): boolean => /\.$/.test(t) && !/^-/.test(t) && t.split(/\s+/).length >= 5
+
+/**
+ * Blocs d'exemple `[début, fin[` : de l'invite jusqu'à la prochaine invite, un titre de section ou une phrase de prose
+ * (les lignes vides n'y mettent pas fin). Un écran d'aide (première ligne de sortie en MAJUSCULES, ex. USAGE) garde
+ * ses titres internes : seuls une phrase, une invite ou un titre `#` le ferment. Lignes vides finales exclues.
+ */
+function exampleBlocks(lines: string[]): [number, number][] {
+  const out: [number, number][] = []
+  let cur: { start: number; last: number; help: boolean | null } | null = null
+  const close = () => { if (cur) out.push([cur.start, cur.last + 1]); cur = null }
+  lines.forEach((l, i) => {
+    const t = l.trim()
+    if (PROMPT.test(l)) { close(); cur = { start: i, last: i, help: null }; return }
+    if (!cur || t === '') return
+    if (cur.help === null) cur.help = isUpperTitle(t)
+    if (isProse(t) || /^#+\s+\S/.test(t) || (!cur.help && isSectionTitle(lines, i))) { close(); return }
+    cur.last = i
   })
+  close()
+  return out
+}
+
+function exampleMask(lines: string[]): boolean[] {
+  const mask = lines.map(() => false)
+  for (const [a, b] of exampleBlocks(lines)) for (let i = a; i < b; i++) mask[i] = true
+  return mask
 }
 
 /** Regroupe les lignes d'une même phrase (retour à la ligne du PDF) ; invites, exemples, options, titres et champs restent seuls. */
@@ -102,17 +126,27 @@ function fieldValue(lines: string[], re: RegExp): { value: string | null; index:
   return { value: null, index: -1 }
 }
 
+const LIST_CONNECTOR = /^(and|et|or|ou|&)$/i
+const tokenOf = (raw: string): string => raw.replace(/\.$/, '').replace(/\(\)$/, '')
+
+/** Ligne de suite d'une liste de fonctions : uniquement des identifiants, et des virgules entre eux (au plus un « and » sans virgule). */
+function isFunctionListLine(l: string): boolean {
+  const t = l.trim()
+  if (t === '' || FIELD_START.test(l) || isTitle(l)) return false
+  const tokens = t.split(/[,;\s]+/).filter(Boolean).filter((w) => !LIST_CONNECTOR.test(w)).map(tokenOf)
+  if (tokens.length === 0 || !tokens.every((w) => IDENT.test(w))) return false
+  if (tokens.length >= 3) return (t.match(/[,;]/g) ?? []).length >= tokens.length - 2
+  // Un ou deux mots : jamais une phrase qui commence par une majuscule (« See below »).
+  return !/^[A-Z][a-z]+$/.test(tokens[0])
+}
+
 function functionsOf(lines: string[], start: number, first: string): string[] {
   const parts = [first]
-  for (let i = start + 1; i < lines.length; i++) {
-    const l = lines[i]
-    if (l.trim() === '' || FIELD_START.test(l)) break
-    parts.push(l)
-  }
+  for (let i = start + 1; i < lines.length && isFunctionListLine(lines[i]); i++) parts.push(lines[i])
   const out: string[] = []
   for (const raw of parts.join(' ').split(/[,;\s]+/)) {
-    const t = raw.replace(/\.$/, '').replace(/\(\)$/, '')
-    if (IDENT.test(t)) out.push(t)
+    const t = tokenOf(raw)
+    if (IDENT.test(t) && !LIST_CONNECTOR.test(t)) out.push(t)
   }
   return uniq(out)
 }
@@ -181,15 +215,7 @@ function optionsOf(lines: string[]): { flag: string; description: string }[] {
 }
 
 function examplesOf(lines: string[]): string[] {
-  const out: string[] = []
-  let cur: string[] | null = null
-  for (const l of lines) {
-    if (l.trim() === '') { if (cur) out.push(cur.join('\n')); cur = null; continue }
-    if (cur) cur.push(l.trimEnd())
-    else if (PROMPT.test(l)) cur = [l.trim()]
-  }
-  if (cur) out.push(cur.join('\n'))
-  return out
+  return exampleBlocks(lines).map(([a, b]) => lines.slice(a, b).map((l, k) => (k === 0 ? l.trim() : l.trimEnd())).join('\n'))
 }
 
 /** Lignes de la section Bonus (indices des lignes concernées, titre exclu). */
@@ -209,7 +235,11 @@ function bonusRange(lines: string[]): [number, number] | null {
 }
 
 export function parseSubject(text: string): SubjectInfo {
-  const lines = String(text ?? '').split(/\r?\n/)
+  // Numéros de page seuls ignorés ; puces ✓ ✔ • retirées en début de ligne.
+  const lines = String(text ?? '')
+    .split(/\r?\n/)
+    .filter((l) => !/^\s*\d+\s*$/.test(l))
+    .map((l) => l.replace(/^(\s*)[✓✔•]\s*/, '$1'))
   const binary = fieldValue(lines, BINARY).value
   const language = fieldValue(lines, LANGUAGE).value
   const repo = fieldValue(lines, REPO).value

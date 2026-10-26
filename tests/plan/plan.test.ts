@@ -104,3 +104,20 @@ test('retards : sans date cible, jamais en retard', () => {
   const s = buildPlan(en, { start: null, end: null, now })
   expect(planStatus(s, [], new Date('2030-01-01T00:00:00')).late).toEqual([])
 })
+
+test('exigences types Epitech gardées dans requirements mais pas dans Fonctionnalités', () => {
+  const i = parseSubject([
+    'The totality of your source files, except all useless files, must be included in your delivery.',
+    'All the bonus files must be in a bonus directory.',
+    'Error messages have to be written on the error output.',
+    'Your project must be compiled using a Makefile.',
+    'The program must reverse each line.'
+  ].join('\n'))
+  expect(i.requirements).toHaveLength(5)
+  const features = buildPlan(i, w).find((s) => s.id === 'features')!
+  expect(features.items.map((x) => x.text)).toEqual(['The program must reverse each line.'])
+})
+test('cas limites formulés comme exemples', () => {
+  const errors = buildPlan(en, w).find((s) => s.id === 'errors')!
+  expect(errors.items.map((i) => i.text)).toContain('Gérer les cas limites (par ex. fichier inexistant, arguments invalides)')
+})
