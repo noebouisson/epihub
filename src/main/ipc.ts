@@ -13,6 +13,7 @@ import { parseSubject } from './plan/subject'
 import { isInsideDir, pdfPathFor } from './reports/pipeline'
 import { latestReportsFor, reportsForKey } from './reports/query'
 import { validRunId, type ReportStore } from './reports/store'
+import { buildGantt, type GanttResult } from '../shared/gantt'
 import { refreshArgs } from './ipcArgs'
 import { isTrustedSender } from './securityPolicy'
 import type { RefreshOptions } from './services/types'
@@ -43,6 +44,12 @@ export interface IpcDeps {
     /** Sélecteur de PDF rattaché à la fenêtre principale ; null si annulé. */
     choosePdf(): Promise<string | null>
     now(): Date
+  }
+  gantt: {
+    /** `<Documents>/AppFlowy/Projets.csv` */
+    csvPath: string
+    showItemInFolder(path: string): void
+    openPath(path: string): Promise<string>
   }
   writeClipboard(text: string): void
   refreshTeams(): void
@@ -181,6 +188,23 @@ export function registerIpc(deps: IpcDeps): void {
     const k = await deps.plan.assembler.canonicalKey(key)
     if (!k || !validItemId(itemId) || typeof done !== 'boolean') return []
     return deps.plan.store.toggle(k, itemId, done)
+  })
+  handle('epihub:gantt', async (): Promise<GanttResult> => {
+    const path = deps.gantt.csvPath
+    const base = { path, projects: [], skipped: [], unreadable: [] }
+    const info = await stat(path).catch(() => null)
+    if (!info?.isFile()) return { ...base, modified: null, error: 'missing' }
+    try {
+      return { path, modified: info.mtime.toISOString(), error: null, ...buildGantt(await readFile(path, 'utf8')) }
+    } catch (err) {
+      console.error('[epihub] gantt:', err instanceof Error ? err.message : String(err))
+      return { ...base, modified: info.mtime.toISOString(), error: 'read' }
+    }
+  })
+  handle('epihub:gantt:show', async (): Promise<void> => {
+    const path = deps.gantt.csvPath
+    if (await stat(path).then((s) => s.isFile(), () => false)) deps.gantt.showItemInFolder(path)
+    else if (await stat(dirname(path)).then((s) => s.isDirectory(), () => false)) await deps.gantt.openPath(dirname(path))
   })
   handle('epihub:plan:summaries', (): Promise<Record<string, PlanSummary>> => deps.plan.assembler.summaries())
   handle('epihub:plan:export', async (_e, key: unknown): Promise<string | null> => {

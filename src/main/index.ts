@@ -210,6 +210,11 @@ function start(): void {
       },
       now: () => new Date()
     },
+    gantt: {
+      csvPath: join(app.getPath('documents'), 'AppFlowy', 'Projets.csv'),
+      showItemInFolder: (p) => shell.showItemInFolder(p),
+      openPath: (p) => shell.openPath(p)
+    },
     writeClipboard: (t) => clipboard.writeText(t)
   });
   registry.start(REFRESH_INTERVAL);

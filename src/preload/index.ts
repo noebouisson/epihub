@@ -34,6 +34,8 @@ const api: EpihubApi = {
   togglePlanItem: (key, itemId, done) => ipcRenderer.invoke('epihub:plan:toggle', key, itemId, done),
   exportPlan: (key) => ipcRenderer.invoke('epihub:plan:export', key),
   planSummaries: () => ipcRenderer.invoke('epihub:plan:summaries'),
+  gantt: () => ipcRenderer.invoke('epihub:gantt'),
+  showGanttFile: () => ipcRenderer.invoke('epihub:gantt:show'),
   onChanged: (cb) => subscribe('epihub:changed', cb),
   onPalette: (cb) => subscribe<void>('epihub:palette', () => cb()),
   onOpen: (cb) => subscribe('epihub:open', cb),

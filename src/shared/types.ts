@@ -1,3 +1,4 @@
+import type { GanttResult } from './gantt'
 export type ServiceId = 'github' | 'intra' | 'myepitech' | 'teams';
 export type ServiceState = 'loading' | 'ok' | 'needs-login' | 'error';
 export interface ServiceStatus { state: ServiceState; message?: string; updatedAt?: number }
@@ -89,6 +90,10 @@ export interface EpihubApi {
   /** Écrit la marche à suivre en Markdown ; renvoie le chemin, ou null. */
   exportPlan(projectKey: string): Promise<string | null>
   planSummaries(): Promise<Record<string, PlanSummary>>
+  /** Projets du CSV AppFlowy (`<Documents>/AppFlowy/Projets.csv`) pour l'onglet Gantt. */
+  gantt(): Promise<GanttResult>
+  /** Montre le CSV (ou son dossier) dans le gestionnaire de fichiers. */
+  showGanttFile(): Promise<void>
 }
 
 /* ---- Rapports de moulinette ---- */

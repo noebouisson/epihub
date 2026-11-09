@@ -27,6 +27,7 @@ export function Sidebar({ view, snapshot, onSelect }: Props): JSX.Element {
       {item('dashboard', '📈', 'Tableau de bord')}
       {item('home', '⌂', 'Accueil')}
       {item('projects', '📁', 'Projets')}
+      {item('gantt', '🗓', 'Gantt')}
       {SERVICES.map((s) => {
         const snap = snapshot?.[s.id];
         const needsLogin = snap?.status.state === 'needs-login';

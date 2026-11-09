@@ -10,6 +10,7 @@ interface Indexed { item: SearchItem; codes: string }
 const PAGES: SearchItem[] = [
   { id: 'page:dashboard', kind: 'page', title: 'Tableau de bord', service: 'app', url: '' },
   { id: 'page:home', kind: 'page', title: 'Accueil', service: 'app', url: '' },
+  { id: 'page:gantt', kind: 'page', title: 'Gantt', service: 'app', url: '' },
   { id: 'page:github', kind: 'page', title: 'GitHub', service: 'github', url: '' },
   { id: 'page:intra', kind: 'page', title: 'Intranet', service: 'intra', url: '' },
   { id: 'page:myepitech', kind: 'page', title: 'My Epitech', service: 'myepitech', url: '' },

@@ -34,7 +34,7 @@ describe('buildSearchItems', () => {
   test('les éléments retournés n’exposent pas `codes`', () => {
     expect(buildSearchItems({ github: { ...ghEmpty, repos: [repo('r')] } }).every((i) => !('codes' in i))).toBe(true)
   })
-  test('snapshot null toléré', () => expect(buildSearchItems({ github: null, intra: null, myepitech: null }).length).toBe(7))
+  test('snapshot null toléré', () => expect(buildSearchItems({ github: null, intra: null, myepitech: null }).length).toBe(8))
 })
 
 describe('projets', () => {

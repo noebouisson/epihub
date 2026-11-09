@@ -5,6 +5,7 @@ import { CommandPalette } from './components/CommandPalette';
 import { ServiceView, type OpenRequest } from './components/ServiceView';
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './pages/Dashboard';
+import { Gantt } from './pages/Gantt';
 import { Home } from './pages/Home';
 import { Project } from './pages/Project';
 import { Projects } from './pages/Projects';
@@ -39,7 +40,7 @@ export function App(): JSX.Element {
   const select = useCallback((v: View) => {
     setView(v);
     if (v === 'projects') setProjectKey(null);
-    if (v !== 'dashboard' && v !== 'home' && v !== 'projects' && v !== 'settings') setMounted((m) => (m.has(v) ? m : new Set(m).add(v)));
+    if (v !== 'dashboard' && v !== 'home' && v !== 'projects' && v !== 'gantt' && v !== 'settings') setMounted((m) => (m.has(v) ? m : new Set(m).add(v)));
   }, []);
 
   const open: OpenFn = useCallback(
@@ -89,6 +90,7 @@ export function App(): JSX.Element {
         ) : (
           <Project key={projectKey} projectKey={projectKey} anchor={anchor} settings={settings} repos={snapshot?.github.data?.repos ?? []} open={open} toast={showToast} onSettings={setSettings} onBack={() => setProjectKey(null)} />
         ))}
+        {view === 'gantt' && <Gantt />}
         {view === 'settings' && <SettingsPage snapshot={snapshot} settings={settings} onSettings={setSettings} open={open} />}
         {SERVICES.filter((s) => mounted.has(s.id)).map((s) => (
           <ServiceView key={s.id} service={s.id} visible={view === s.id} request={requests[s.id]} state={snapshot?.[s.id].status.state} />
