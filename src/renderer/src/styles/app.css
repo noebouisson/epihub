@@ -201,3 +201,6 @@ h2 { font-size: 15px; margin: 0; }
 .gantt-key { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 4px; background: var(--accent); }
 .gantt-key.gantt-bar-todo { background: var(--text-dim); }
 .gantt-key-today { background: var(--warn); width: 3px; }
+.gantt-bar-perso { background: var(--ok); color: var(--accent-text); }
+.gantt-key.gantt-bar-perso { background: var(--ok); }
+.gantt-bar-perso.gantt-bar-open { background: linear-gradient(90deg, var(--ok) 55%, transparent); }

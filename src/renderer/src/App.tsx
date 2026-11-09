@@ -90,7 +90,7 @@ export function App(): JSX.Element {
         ) : (
           <Project key={projectKey} projectKey={projectKey} anchor={anchor} settings={settings} repos={snapshot?.github.data?.repos ?? []} open={open} toast={showToast} onSettings={setSettings} onBack={() => setProjectKey(null)} />
         ))}
-        {view === 'gantt' && <Gantt />}
+        {view === 'gantt' && <Gantt snapshot={snapshot} open={open} openProject={openProject} />}
         {view === 'settings' && <SettingsPage snapshot={snapshot} settings={settings} onSettings={setSettings} open={open} />}
         {SERVICES.filter((s) => mounted.has(s.id)).map((s) => (
           <ServiceView key={s.id} service={s.id} visible={view === s.id} request={requests[s.id]} state={snapshot?.[s.id].status.state} />

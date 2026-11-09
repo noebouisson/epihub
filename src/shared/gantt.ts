@@ -1,4 +1,6 @@
-/* Diagramme de Gantt des projets, lu depuis l'export CSV d'AppFlowy (base « Projets »). */
+/* Diagramme de Gantt des projets : projets Epitech depuis My Epitech, projets perso depuis l'export CSV d'AppFlowy. */
+import { projectKey } from './projects'
+import type { MyProject } from './types'
 
 export interface GanttProject {
   name: string
@@ -11,6 +13,9 @@ export interface GanttProject {
   module: string
   with: string
   verify: boolean
+  source: 'myepitech' | 'csv'
+  /** Clé du projet EpiHub (projets My Epitech), pour ouvrir sa page. */
+  key: string | null
 }
 
 export interface GanttResult {
@@ -126,12 +131,49 @@ export function buildGantt(csv: string): Pick<GanttResult, 'projects' | 'skipped
       category: pick(row, 'Catégorie', 'Category'),
       module: pick(row, 'Module'),
       with: pick(row, 'Avec', 'With'),
-      verify: truthy(pick(row, 'Dates à vérifier'))
+      verify: truthy(pick(row, 'Dates à vérifier')),
+      source: 'csv',
+      key: null
     })
   }
+  return { projects: sortGantt(projects), skipped, unreadable }
+}
+
+/** En cours d'abord, puis par date de rendu, puis par nom. */
+export function sortGantt(projects: GanttProject[]): GanttProject[] {
   const rank = (p: GanttProject): number => (norm(p.status) === 'en cours' ? 0 : 1)
-  projects.sort((a, b) => rank(a) - rank(b) || (a.end ?? '9999').localeCompare(b.end ?? '9999') || a.name.localeCompare(b.name))
-  return { projects, skipped, unreadable }
+  return [...projects].sort((a, b) => rank(a) - rank(b) || (a.end ?? '9999').localeCompare(b.end ?? '9999') || a.name.localeCompare(b.name))
+}
+
+/** Jour local (AAAA-MM-JJ) d'un instant ISO. */
+export const localDay = (isoTime: string): string => {
+  const d = new Date(isoTime)
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+/** Au-delà, une inscription (ex. « Student Engagement », 1 an) n'est pas un projet à planifier. */
+export const MAX_PROJECT_DAYS = 90
+
+/** Projets My Epitech pas encore terminés : « En cours » si commencés, sinon « À venir ». */
+export function fromMyEpitech(projects: MyProject[], today: string): GanttProject[] {
+  const out: GanttProject[] = []
+  for (const p of projects) {
+    if (!p.start || !p.end || Number.isNaN(Date.parse(p.start)) || Number.isNaN(Date.parse(p.end))) continue
+    const start = localDay(p.start)
+    const end = localDay(p.end)
+    if (end < today || daysBetween(start, end) > MAX_PROJECT_DAYS) continue
+    out.push({
+      name: p.name, status: start <= today ? 'En cours' : 'À venir', start, end,
+      category: 'Epitech', module: p.unitCode, with: '', verify: false,
+      source: 'myepitech', key: projectKey(p.unitCode, p.name)
+    })
+  }
+  return sortGantt(out)
+}
+
+/** My Epitech pour Epitech ; le CSV n'ajoute que les projets hors Epitech (perso). */
+export function mergeGantt(myepitech: GanttProject[], csv: GanttProject[]): GanttProject[] {
+  return sortGantt([...myepitech, ...csv.filter((p) => norm(p.category) !== 'epitech')])
 }
 
 const DAY = 86_400_000
